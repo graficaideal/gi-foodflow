@@ -37,12 +37,20 @@ function MealPill({letter, done, locked, on}) {
   )
 }
 
-// Aba do dia: a selecionada desce 15px e funde-se com a borda mustard do painel.
+// Canto côncavo (R=14) na base da aba selecionada, assente na borda superior do painel.
+const FILLET = 14
+function Fillet({side}) {
+  return <span style={{position:'absolute',bottom:3,[side]:-(3+FILLET),width:FILLET,height:FILLET,pointerEvents:'none',
+    background:`radial-gradient(circle at ${side==='left'?'0 0':'100% 0'}, transparent ${FILLET}px, ${C.yellow} ${FILLET+0.5}px)`}}/>
+}
+
+// Aba do dia: a selecionada desce até ao fundo da linha superior do painel e funde-se com ela.
 function DayChip({d, sel, isToday, past, marks, locked, onClick}) {
   const dd = new Date(d+'T12:00:00')
   return (
     <button onClick={onClick}
-      style={{flex:1,minWidth:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',height:sel?115:100,background:sel?C.yellow:C.surface,color:sel?C.bg:C.text,border:`${sel?3:2}px solid ${sel?C.yellow:C.border2}`,borderRadius:sel?'16px 16px 0 0':16,padding:sel?'10px 12px 22px':'10px 12px',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:'hidden',opacity:past&&!sel?0.5:1}}>
+      style={{flex:1,minWidth:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',height:sel?112:100,background:sel?C.yellow:C.surface,color:sel?C.bg:C.text,border:`${sel?3:2}px solid ${sel?C.yellow:C.border2}`,borderBottomWidth:sel?0:2,borderRadius:sel?'16px 16px 0 0':16,padding:sel?'10px 12px 19px':'10px 12px',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:sel?'visible':'hidden',position:sel?'relative':undefined,opacity:past&&!sel?0.5:1}}>
+      {sel && <><Fillet side="left"/><Fillet side="right"/></>}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
         <div style={{display:'flex',alignItems:'baseline',gap:6,minWidth:0}}>
           <span style={{fontSize:34,fontWeight:700,lineHeight:1}}>{String(dd.getDate()).padStart(2,'0')}</span>
