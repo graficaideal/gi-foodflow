@@ -3,3 +3,9 @@ dist/
 .env
 .env.local
 .env.*.local
+
+.vercel
+.env*
+
+# Handoffs de design (referência local)
+design_handoff_*/

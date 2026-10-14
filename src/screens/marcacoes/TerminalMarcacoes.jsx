@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
-import { WD, TODAY, addD } from '../../utils/date'
+import { WD, WD_FULL, MN, TODAY, addD } from '../../utils/date'
 import { fmtHorario } from '../../utils/meal'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
@@ -37,11 +37,12 @@ function MealPill({letter, done, locked, on}) {
   )
 }
 
+// Aba do dia: a selecionada desce 15px e funde-se com a borda mustard do painel.
 function DayChip({d, sel, isToday, past, marks, locked, onClick}) {
   const dd = new Date(d+'T12:00:00')
   return (
     <button onClick={onClick}
-      style={{flex:1,minWidth:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',background:sel?C.yellow:C.surface,color:sel?C.bg:C.text,border:`2px solid ${sel?C.yellow:C.border2}`,borderRadius:16,padding:'10px 12px',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:'hidden',opacity:past&&!sel?0.5:1}}>
+      style={{flex:1,minWidth:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',height:sel?115:100,background:sel?C.yellow:C.surface,color:sel?C.bg:C.text,border:`${sel?3:2}px solid ${sel?C.yellow:C.border2}`,borderRadius:sel?'16px 16px 0 0':16,padding:sel?'10px 12px 22px':'10px 12px',display:'flex',flexDirection:'column',justifyContent:'space-between',overflow:'hidden',opacity:past&&!sel?0.5:1}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
         <div style={{display:'flex',alignItems:'baseline',gap:6,minWidth:0}}>
           <span style={{fontSize:34,fontWeight:700,lineHeight:1}}>{String(dd.getDate()).padStart(2,'0')}</span>
@@ -56,6 +57,33 @@ function DayChip({d, sel, isToday, past, marks, locked, onClick}) {
   )
 }
 
+// Botão de refeição: obrigatório antes dos pratos. Selecionado = mustard + seta para os pratos.
+function MealButton({emoji, label, hour, on, pratoLabel, locked, past, onClick}) {
+  const st = pratoLabel ? {icon:locked?'lock':'check', text:pratoLabel, color:on?C.bg:C.success}
+    : locked ? {icon:'lock', text:past?'Dia já passou':'Fechado', color:on?C.bg:C.textSub}
+    : {icon:null, text:'Por marcar', color:on?C.bg:C.warn}
+  return (
+    <button onClick={onClick}
+      style={{flex:1,minHeight:0,position:'relative',cursor:'pointer',fontFamily:'inherit',textAlign:'left',background:on?C.yellow:C.surface,color:on?C.bg:C.text,border:`3px solid ${on?C.yellow:C.border2}`,borderRadius:16,padding:'16px 18px',display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <span style={{fontSize:30,lineHeight:1}}>{emoji}</span>
+        <div>
+          <div style={{fontSize:30,fontWeight:800,lineHeight:1}}>{label}</div>
+          <div style={{fontSize:14,fontWeight:600,marginTop:5,opacity:0.75}}>{hour}</div>
+        </div>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:8,fontSize:16,fontWeight:800,color:st.color,minWidth:0}}>
+        {st.icon ? <Icon name={st.icon} size={18}/> : <span style={{width:12,height:12,borderRadius:'50%',border:`2.5px solid ${st.color}`,flexShrink:0}}/>}
+        <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{st.text}</span>
+      </div>
+      {on && <span style={{position:'absolute',right:-19,top:'50%',transform:'translateY(-50%)',width:0,height:0,borderTop:'14px solid transparent',borderBottom:'14px solid transparent',borderLeft:`14px solid ${C.yellow}`}}/>}
+    </button>
+  )
+}
+
+// "quinta, 04 Jun"
+const fmtDia = d => { const x=new Date(d+'T12:00:00'); return `${WD_FULL[x.getDay()].split('-')[0].toLowerCase()}, ${String(x.getDate()).padStart(2,'0')} ${MN[x.getMonth()]}` }
+
 export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}) {
   const s = {...DEFAULTS,...settings}
   const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'
@@ -66,6 +94,7 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
   const [err,       setErr]       = useState('')
   const [selDay,    setSelDay]    = useState(TODAY)
   const [weekOffset,setWeekOffset]= useState(0)
+  const [selMeal,   setSelMeal]   = useState(null)   // 'A' | 'J' | null
   const [marcacoes, setMarcacoes] = useState([])
   const [rfidMsg,   setRfidMsg]   = useState('')
   const [toast,     setToast]     = useState(null)   // { msg, error }
@@ -123,7 +152,7 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
     else{setErr('PIN incorreto');setPinInput('');setTimeout(()=>setErr(''),3000)}
   }
 
-  const logout = () => {setStep('numero');setFunc(null);setNumInput('');setPinInput('');setErr('');setSelDay(TODAY);setWeekOffset(0);setMarcacoes([])}
+  const logout = () => {setStep('numero');setFunc(null);setNumInput('');setPinInput('');setErr('');setSelDay(TODAY);setSelMeal(null);setWeekOffset(0);setMarcacoes([])}
 
   if (step==='numero') {
     const leftPanel = (
@@ -171,11 +200,14 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
   const bloqueado = s.bloquear_dia_proprio==='true'
 
   // Semana de trabalho fixa (seg–sex). Se selDay não pertence à semana visível, seleciona o 1.º dia não passado.
-  const weekDays = Array.from({length:5}, (_,i) => addD(WEEK0, weekOffset*7+i))
+  const daysOf   = off => Array.from({length:5}, (_,i) => addD(WEEK0, off*7+i))
+  const weekDays = daysOf(weekOffset)
   const day      = weekDays.includes(selDay) ? selDay : (weekDays.find(d=>d>=TODAY) || weekDays[0])
   const hasPrev  = weekOffset > 0
   const hasNext  = ementas.some(e=>e.data>weekDays[4])
-  const goWeek   = off => { setWeekOffset(off); setSelDay(null) }
+  // Mudar de dia ou de semana limpa SEMPRE a refeição: obriga a confirmar a refeição em cada dia.
+  const selectDay = d => { setSelDay(d); setSelMeal(null) }
+  const goWeek   = off => { const w=daysOf(off); setWeekOffset(off); selectDay(w.find(d=>d>=TODAY) || w[0]) }
   const isLocked = d => d<TODAY || (d===TODAY && bloqueado)
 
   const dayEm  = ementas.filter(e=>e.data===day)
@@ -185,80 +217,104 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
 
   const flash = (msg, error=false) => {
     setToast({msg,error}); clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(()=>setToast(null), 2200)
+    toastTimer.current = setTimeout(()=>setToast(null), 2600)
   }
-  const doMarcar   = async (em,n,label,pratoLabel) => { if (await marcar(em,n)) flash('Erro ao guardar',true); else flash(`${label} marcado · ${pratoLabel}`) }
-  const doCancelar = async (em,label) => { if (await cancelar(em.id)) flash('Erro ao guardar',true); else flash(`${label} desmarcado`) }
+  const dia = fmtDia(day)
+  const doMarcar   = async (em,n,label,pratoLabel) => { if (await marcar(em,n)) flash('Erro ao guardar',true); else flash(`${label} de ${dia} · ${pratoLabel}`) }
+  const doCancelar = async (em,label) => { if (await cancelar(em.id)) flash('Erro ao guardar',true); else flash(`${label} de ${dia} desmarcado`) }
 
   const futureIds = new Set(ementas.filter(e=>e.data>=TODAY).map(e=>e.id))
   const nFuturas  = marcacoes.filter(m=>futureIds.has(m.ementa_id)).length
   const locked    = isLocked(day)
-  const arrow = off => ({width:60,flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:16,color:C.textSub,display:'flex',alignItems:'center',justifyContent:'center',cursor:off?'default':'pointer',opacity:off?0.3:1})
+  const arrow = off => ({width:60,height:100,flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:16,color:C.textSub,display:'flex',alignItems:'center',justifyContent:'center',cursor:off?'default':'pointer',opacity:off?0.3:1})
+
+  // Refeição escolhida neste dia (só existe se o dia tiver ementa desse tipo)
+  const em     = selMeal && dayEm.find(e=>e.tipo===selMeal)
+  const meal   = em && MEALS.find(m=>m.tipo===selMeal)
+  const marc   = em && getM(em.id)
+  const pratos = em ? [1,2,3,4].map(n=>({n,label:em[`prato${n}_label`],desc:em[`prato${n}_desc`]})).filter(p=>p.label) : []
 
   return (
     <div style={{height:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative'}}>
       {/* Topbar */}
-      <div style={{height:84,padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:20}}>
+      <div style={{height:80,padding:'0 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,gap:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:18,minWidth:0}}>
           {!narrow && <Logo size="sm" showSub={false}/>}
           {!narrow && <div style={{width:1,height:40,background:C.border}}/>}
           <Avatar nome={func.nome} foto={func.foto} size={52}/>
-          <div>
+          <div style={{minWidth:0}}>
             <div style={{fontSize:24,fontWeight:700,lineHeight:1.1}}>Olá, {func.nome.split(' ')[0]}</div>
             <div style={{fontSize:14,color:C.textSub,marginTop:3}}>Nº {func.numero} · {nFuturas} {nFuturas===1?'refeição marcada':'refeições marcadas'}</div>
           </div>
         </div>
-        <button onClick={logout} style={{height:60,padding:'0 28px',background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,fontSize:18,fontWeight:700,display:'inline-flex',alignItems:'center',gap:12,cursor:'pointer',fontFamily:'inherit'}}>
+        <button onClick={logout} style={{height:60,padding:'0 26px',flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,fontSize:18,fontWeight:700,display:'inline-flex',alignItems:'center',gap:12,cursor:'pointer',fontFamily:'inherit'}}>
           <Icon name="logout" size={22}/>Terminar
         </button>
       </div>
 
-      {/* Day strip */}
-      <div style={{height:108,padding:'0 20px',display:'flex',gap:8,flexShrink:0}}>
+      {/* Week strip: o dia selecionado é uma aba ligada ao painel */}
+      <div style={{height:112,padding:'0 20px',display:'flex',gap:8,flexShrink:0,alignItems:'flex-start',position:'relative',zIndex:2}}>
         <button disabled={!hasPrev} onClick={()=>goWeek(weekOffset-1)} aria-label="Semana anterior" style={arrow(!hasPrev)}><Icon name="chev-l" size={30}/></button>
         {weekDays.map(d => {
-          const marks = Object.fromEntries(MEALS.map(m => { const em=ementas.find(e=>e.data===d&&e.tipo===m.tipo); return [m.tipo, !!(em&&getM(em.id))] }))
-          return <DayChip key={d} d={d} sel={day===d} isToday={d===TODAY} past={d<TODAY} marks={marks} locked={isLocked(d)} onClick={()=>setSelDay(d)}/>
+          const marks = Object.fromEntries(MEALS.map(m => { const e=ementas.find(e=>e.data===d&&e.tipo===m.tipo); return [m.tipo, !!(e&&getM(e.id))] }))
+          return <DayChip key={d} d={d} sel={day===d} isToday={d===TODAY} past={d<TODAY} marks={marks} locked={isLocked(d)} onClick={()=>selectDay(d)}/>
         })}
         <button disabled={!hasNext} onClick={()=>goWeek(weekOffset+1)} aria-label="Semana seguinte" style={arrow(!hasNext)}><Icon name="chev-r" size={30}/></button>
       </div>
 
-      {/* Linhas de refeição */}
-      <div style={{flex:1,minHeight:0,padding:'16px 24px 24px',display:'flex',flexDirection:'column',gap:14}}>
-        {MEALS.map(({tipo,emoji,label}) => {
-          const em=dayEm.find(e=>e.tipo===tipo); if(!em) return null
-          const marc=getM(em.id)
-          const pratos=[1,2,3,4].map(n=>({n,label:em[`prato${n}_label`],desc:em[`prato${n}_desc`]})).filter(p=>p.label)
-          const hour = fmtHorario(s, tipo)
-          return (
-            <div key={tipo} style={{flex:1,minHeight:0,display:'grid',gridTemplateColumns:`${narrow?170:210}px repeat(4, minmax(0,1fr))`,gap:narrow?10:12}}>
-              <div style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:18,padding:18,display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
-                <div>
-                  <div style={{fontSize:30,lineHeight:1}}>{emoji}</div>
-                  <div style={{fontSize:narrow?26:30,fontWeight:700,marginTop:10,lineHeight:1}}>{label}</div>
-                  <div style={{fontSize:15,color:C.textSub,marginTop:6}}>{hour}</div>
-                </div>
-                {locked
-                  ? <div style={{display:'flex',alignItems:'center',gap:8,fontSize:14,fontWeight:600,color:C.textSub,lineHeight:1.3}}><Icon name="lock" size={18}/>{day<TODAY ? 'Dia já passou' : 'Já não é possível alterar'}</div>
-                  : marc
-                    ? <button onClick={()=>doCancelar(em,label)} style={{height:56,borderRadius:12,background:'transparent',border:`2px solid ${C.border2}`,color:C.text,fontSize:16,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8}}><Icon name="x" size={18}/>Desmarcar</button>
-                    : <div style={{fontSize:15,fontWeight:700,color:C.warn,display:'flex',alignItems:'center',gap:8}}><span style={{width:10,height:10,borderRadius:'50%',border:`2px solid ${C.warn}`}}/>Por marcar</div>}
-              </div>
-              {pratos.map(p => (
-                <PratoCard key={p.n} slot={p.n} label={p.label} desc={p.desc} locked={locked} compact={narrow}
-                  selected={marc?.prato_num===p.n} dim={!!marc&&marc.prato_num!==p.n}
-                  onClick={()=>marc?.prato_num===p.n ? doCancelar(em,label) : doMarcar(em,p.n,label,p.label)}/>
-              ))}
-            </div>
-          )
-        })}
-        {dayEm.length===0 && (
+      {/* Painel do dia */}
+      <div style={{flex:1,minHeight:0,margin:'-3px 20px 20px',border:`3px solid ${C.yellow}`,borderRadius:20,background:C.surface,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative',zIndex:1}}>
+        <div style={{height:64,flexShrink:0,padding:'0 20px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${C.border}`,gap:16}}>
+          <div style={{display:'flex',alignItems:'baseline',gap:12,minWidth:0}}>
+            <span style={{fontSize:12,fontWeight:800,letterSpacing:'0.12em',color:C.textMuted,flexShrink:0}}>{meal ? 'A MARCAR' : 'PASSO 1 DE 2'}</span>
+            <span style={{fontSize:narrow?22:26,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+              {meal ? <><span style={{color:C.yellow}}>{meal.label}</span> de {dia}</> : <>Escolhe almoço ou jantar de <span style={{color:C.yellow}}>{dia}</span></>}
+            </span>
+          </div>
+          {marc && !locked && (
+            <button onClick={()=>doCancelar(em,meal.label)} style={{height:48,padding:'0 18px',flexShrink:0,borderRadius:12,background:'transparent',border:`2px solid ${C.border2}`,color:C.text,fontSize:16,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'inline-flex',alignItems:'center',gap:8}}>
+              <Icon name="x" size={18}/>Desmarcar
+            </button>
+          )}
+        </div>
+
+        {dayEm.length===0 ? (
           <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.textSub,fontSize:20}}>Sem ementa para este dia.</div>
+        ) : (
+          <div style={{flex:1,minHeight:0,display:'grid',gridTemplateColumns:`${narrow?250:300}px minmax(0,1fr)`}}>
+            <div style={{padding:16,display:'flex',flexDirection:'column',gap:12,borderRight:`1px solid ${C.border}`,background:C.bg}}>
+              {MEALS.map(({tipo,emoji,label}) => {
+                const e=dayEm.find(e=>e.tipo===tipo); if(!e) return null
+                const m=getM(e.id)
+                return <MealButton key={tipo} emoji={emoji} label={label} hour={fmtHorario(s,tipo)} on={selMeal===tipo}
+                  pratoLabel={m && e[`prato${m.prato_num}_label`]} locked={locked} past={day<TODAY} onClick={()=>setSelMeal(tipo)}/>
+              })}
+            </div>
+            <div style={{padding:16,minHeight:0,display:'flex'}}>
+              {!meal ? (
+                <div style={{flex:1,borderRadius:16,border:`2px dashed ${C.border2}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,color:C.textSub,textAlign:'center',padding:24}}>
+                  <div style={{width:72,height:72,borderRadius:'50%',background:C.bg,border:`2px solid ${C.border2}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <Icon name="arrow-l" size={34} color={C.yellow}/>
+                  </div>
+                  <div style={{fontSize:26,fontWeight:700,color:C.text}}>Primeiro, escolhe a refeição</div>
+                  <div style={{fontSize:17,maxWidth:420,lineHeight:1.4}}>Toca em <strong style={{color:C.text}}>Almoço</strong> ou <strong style={{color:C.text}}>Jantar</strong> à esquerda para ver os pratos de {dia}.</div>
+                </div>
+              ) : (
+                <div style={{flex:1,display:'grid',gridTemplateColumns:'repeat(2, minmax(0,1fr))',gridTemplateRows:'repeat(2, minmax(0,1fr))',gap:12}}>
+                  {pratos.map(p => (
+                    <PratoCard key={p.n} slot={p.n} label={p.label} desc={p.desc} locked={locked} compact={narrow}
+                      selected={marc?.prato_num===p.n} dim={marc ? marc.prato_num!==p.n : locked}
+                      onClick={()=>marc?.prato_num===p.n ? doCancelar(em,meal.label) : doMarcar(em,p.n,meal.label,p.label)}/>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
       {toast && (
-        <div role="status" style={{position:'absolute',left:'50%',bottom:36,transform:'translateX(-50%)',background:C.text,color:toast.error?C.danger:C.bg,borderRadius:14,padding:'16px 26px',fontSize:18,fontWeight:700,display:'flex',alignItems:'center',gap:12,boxShadow:'0 16px 40px rgba(0,0,0,0.45)',whiteSpace:'nowrap'}}>
+        <div role="status" style={{position:'absolute',left:'50%',bottom:34,transform:'translateX(-50%)',background:C.text,color:toast.error?C.danger:C.bg,borderRadius:14,padding:'16px 26px',fontSize:18,fontWeight:700,display:'flex',alignItems:'center',gap:12,boxShadow:'0 16px 40px rgba(0,0,0,0.45)',whiteSpace:'nowrap',zIndex:5}}>
           <Icon name={toast.error?'warn':'check'} size={22}/>{toast.msg}
         </div>
       )}
