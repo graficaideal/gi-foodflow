@@ -24,6 +24,10 @@ body {
   100% { transform: scale(1.8); opacity: 0; }
 }
 
+@keyframes ff-sheet-in {
+  from { transform: translateX(100%); }
+}
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }

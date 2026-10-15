@@ -9,6 +9,7 @@ import Icon from '../../components/Icon'
 import Logo from '../../components/Logo'
 import LoginShell, { ARR } from '../../components/LoginShell'
 import PratoCard from '../../components/PratoCard'
+import { pratoColors } from '../../constants/pratos'
 import useSerial from '../../hooks/useSerial'
 
 const MEALS = [{tipo:'A',emoji:'🌞',label:'Almoço'},{tipo:'J',emoji:'🌙',label:'Jantar'}]
@@ -92,6 +93,80 @@ function MealButton({emoji, label, hour, on, pratoLabel, locked, past, onClick})
 // "quinta, 04 Jun"
 const fmtDia = d => { const x=new Date(d+'T12:00:00'); return `${WD_FULL[x.getDay()].split('-')[0].toLowerCase()}, ${String(x.getDate()).padStart(2,'0')} ${MN[x.getMonth()]}` }
 
+// Painel lateral: marcações de hoje em diante, agrupadas por dia. Eliminar = 2 toques; linha bloqueada sem ação.
+function MinhasMarcacoes({items, total, narrow, s, isLocked, confirmId, setConfirmId, onRemove, onOpen, onClose}) {
+  const groups = []
+  items.forEach(it => { const g=groups[groups.length-1]; g?.data===it.em.data ? g.items.push(it) : groups.push({data:it.em.data,items:[it]}) })
+  return (
+    <div style={{position:'absolute',inset:0,zIndex:10,display:'flex',justifyContent:'flex-end'}}>
+      <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)'}}/>
+      <div style={{position:'relative',width:narrow?520:600,height:'100%',background:C.surface,borderLeft:`1px solid ${C.border}`,boxShadow:'0 24px 64px rgba(0,0,0,0.5)',display:'flex',flexDirection:'column',borderRadius:'20px 0 0 20px',overflow:'hidden',animation:'ff-sheet-in .2s ease-out'}}>
+        <div style={{height:88,flexShrink:0,padding:'0 16px 0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${C.border}`}}>
+          <div>
+            <div style={{fontSize:26,fontWeight:800,lineHeight:1.1}}>As minhas marcações</div>
+            <div style={{fontSize:15,color:C.textSub,marginTop:4}}>{total} {total===1?'refeição marcada':'refeições marcadas'} · de hoje em diante</div>
+          </div>
+          <button onClick={onClose} aria-label="Fechar" style={{width:60,height:60,borderRadius:14,background:C.bg,border:`2px solid ${C.border2}`,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+            <Icon name="x" size={26}/>
+          </button>
+        </div>
+        <div style={{flex:1,minHeight:0,overflowY:'auto',padding:'8px 16px 20px'}}>
+          {groups.length===0 && (
+            <div style={{height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10,color:C.textSub,textAlign:'center'}}>
+              <div style={{fontSize:22,fontWeight:700,color:C.text}}>Sem marcações.</div>
+              <div style={{fontSize:16}}>Escolhe um dia e marca a primeira refeição.</div>
+            </div>
+          )}
+          {groups.map(g => (
+            <div key={g.data} style={{marginTop:14}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'0 6px 8px'}}>
+                <span style={{fontSize:15,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase',color:C.textSub}}>{fmtDia(g.data)}</span>
+                {g.data===TODAY && <span style={{fontSize:10,fontWeight:800,letterSpacing:'0.1em',padding:'3px 6px',borderRadius:6,background:C.yellow,color:C.bg}}>HOJE</span>}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {g.items.map(({em,meal,n}) => {
+                  const {fg} = pratoColors(n)
+                  const locked = isLocked(em.data)
+                  const conf = confirmId===em.id
+                  return (
+                    <div key={em.id} style={{display:'flex',alignItems:'stretch',gap:8,height:80}}>
+                      <button onClick={locked?undefined:()=>onOpen(em)} style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:14,padding:'0 16px 0 0',background:conf?'rgba(248,113,113,0.08)':C.bg,border:`2px solid ${conf?C.danger:C.border2}`,borderRadius:14,cursor:locked?'default':'pointer',fontFamily:'inherit',textAlign:'left',color:C.text,overflow:'hidden'}}>
+                        <span style={{width:8,alignSelf:'stretch',background:fg,flexShrink:0}}/>
+                        <div style={{width:96,flexShrink:0}}>
+                          <div style={{fontSize:13,color:C.textSub,fontWeight:600}}>{meal.emoji} {fmtHorario(s,meal.tipo).split(' ')[0]}</div>
+                          <div style={{fontSize:19,fontWeight:800,marginTop:2}}>{meal.label}</div>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:800,letterSpacing:'0.06em',textTransform:'uppercase',color:fg,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{em[`prato${n}_label`]}</div>
+                          <div style={{fontSize:16,fontWeight:500,marginTop:3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{em[`prato${n}_desc`]}</div>
+                        </div>
+                      </button>
+                      {locked ? (
+                        <div style={{width:80,flexShrink:0,borderRadius:14,border:`2px solid ${C.border2}`,color:C.textMuted,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,fontSize:12,fontWeight:700}}>
+                          <Icon name="lock" size={20}/>Fechado
+                        </div>
+                      ) : conf ? (
+                        <div style={{display:'flex',gap:8,flexShrink:0}}>
+                          <button onClick={()=>setConfirmId(null)} aria-label="Cancelar" style={{width:64,borderRadius:14,background:C.bg,border:`2px solid ${C.border2}`,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Icon name="x" size={22}/></button>
+                          <button onClick={()=>onRemove(em,meal.label)} style={{width:120,borderRadius:14,background:C.danger,border:`2px solid ${C.danger}`,color:'#fff',fontSize:17,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',gap:8,cursor:'pointer',fontFamily:'inherit'}}><Icon name="trash" size={20}/>Eliminar</button>
+                        </div>
+                      ) : (
+                        <button onClick={()=>setConfirmId(em.id)} aria-label="Eliminar" style={{width:80,flexShrink:0,borderRadius:14,background:'transparent',border:'2px solid rgba(248,113,113,0.45)',color:C.danger,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+                          <Icon name="trash" size={24}/>
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}) {
   const s = {...DEFAULTS,...settings}
   const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'
@@ -106,6 +181,8 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
   const [marcacoes, setMarcacoes] = useState([])
   const [rfidMsg,   setRfidMsg]   = useState('')
   const [toast,     setToast]     = useState(null)   // { msg, error }
+  const [listOpen,  setListOpen]  = useState(false)
+  const [confirmId, setConfirmId] = useState(null)   // ementa_id em confirmação de eliminação
   const toastTimer = useRef(null)
   const narrow = useNarrow()
 
@@ -160,7 +237,7 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
     else{setErr('PIN incorreto');setPinInput('');setTimeout(()=>setErr(''),3000)}
   }
 
-  const logout = () => {setStep('numero');setFunc(null);setNumInput('');setPinInput('');setErr('');setSelDay(TODAY);setSelMeal(null);setWeekOffset(0);setMarcacoes([])}
+  const logout = () => {setStep('numero');setFunc(null);setNumInput('');setPinInput('');setErr('');setSelDay(TODAY);setSelMeal(null);setWeekOffset(0);setMarcacoes([]);setListOpen(false);setConfirmId(null)}
 
   if (step==='numero') {
     const leftPanel = (
@@ -229,10 +306,18 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
   }
   const dia = fmtDia(day)
   const doMarcar   = async (em,n,label,pratoLabel) => { if (await marcar(em,n)) flash('Erro ao guardar',true); else flash(`${label} de ${dia} · ${pratoLabel}`) }
-  const doCancelar = async (em,label) => { if (await cancelar(em.id)) flash('Erro ao guardar',true); else flash(`${label} de ${dia} desmarcado`) }
+  const doCancelar = async (em,label,verbo='desmarcado') => { if (await cancelar(em.id)) flash('Erro ao guardar',true); else flash(`${label} de ${fmtDia(em.data)} ${verbo}`) }
 
   const futureIds = new Set(ementas.filter(e=>e.data>=TODAY).map(e=>e.id))
   const nFuturas  = marcacoes.filter(m=>futureIds.has(m.ementa_id)).length
+  const minhas    = ementas.filter(e=>futureIds.has(e.id)).map(em=>({em,meal:MEALS.find(m=>m.tipo===em.tipo),n:getM(em.id)?.prato_num})).filter(x=>x.n&&x.meal)
+    .sort((a,b)=>a.em.data.localeCompare(b.em.data)||a.em.tipo.localeCompare(b.em.tipo))
+  const closeList = () => { setListOpen(false); setConfirmId(null) }
+  const openFromList = em => {
+    const off = Math.floor(Math.round((new Date(em.data+'T12:00:00')-new Date(WEEK0+'T12:00:00'))/864e5)/7)
+    setWeekOffset(off); setSelDay(em.data); setSelMeal(em.tipo); closeList()
+  }
+  const removeFromList = async (em,label) => { setConfirmId(null); await doCancelar(em,label,'eliminado') }
   const locked    = isLocked(day)
   const arrow = off => ({width:60,height:100,flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:16,color:C.textSub,display:'flex',alignItems:'center',justifyContent:'center',cursor:off?'default':'pointer',opacity:off?0.3:1})
 
@@ -255,9 +340,15 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
             <div style={{fontSize:14,color:C.textSub,marginTop:3}}>Nº {func.numero} · {nFuturas} {nFuturas===1?'refeição marcada':'refeições marcadas'}</div>
           </div>
         </div>
-        <button onClick={logout} style={{height:60,padding:'0 26px',flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,fontSize:18,fontWeight:700,display:'inline-flex',alignItems:'center',gap:12,cursor:'pointer',fontFamily:'inherit'}}>
-          <Icon name="logout" size={22}/>Terminar
-        </button>
+        <div style={{display:'flex',gap:10,flexShrink:0}}>
+          <button onClick={()=>{setListOpen(true);setConfirmId(null)}} style={{height:60,padding:'0 22px',background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,fontSize:18,fontWeight:700,display:'inline-flex',alignItems:'center',gap:12,cursor:'pointer',fontFamily:'inherit'}}>
+            <Icon name="list" size={22}/>{narrow?'Marcações':'As minhas marcações'}
+            <span style={{minWidth:32,height:32,padding:'0 9px',borderRadius:99,background:C.yellow,color:C.bg,fontSize:16,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{nFuturas}</span>
+          </button>
+          <button onClick={logout} style={{height:60,padding:'0 26px',flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,fontSize:18,fontWeight:700,display:'inline-flex',alignItems:'center',gap:12,cursor:'pointer',fontFamily:'inherit'}}>
+            <Icon name="logout" size={22}/>Terminar
+          </button>
+        </div>
       </div>
 
       {/* Week strip: o dia selecionado é uma aba ligada ao painel */}
@@ -321,8 +412,11 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
         )}
       </div>
 
+      {listOpen && <MinhasMarcacoes items={minhas} total={nFuturas} narrow={narrow} s={s} isLocked={isLocked}
+        confirmId={confirmId} setConfirmId={setConfirmId} onRemove={removeFromList} onOpen={openFromList} onClose={closeList}/>}
+
       {toast && (
-        <div role="status" style={{position:'absolute',left:'50%',bottom:34,transform:'translateX(-50%)',background:C.text,color:toast.error?C.danger:C.bg,borderRadius:14,padding:'16px 26px',fontSize:18,fontWeight:700,display:'flex',alignItems:'center',gap:12,boxShadow:'0 16px 40px rgba(0,0,0,0.45)',whiteSpace:'nowrap',zIndex:5}}>
+        <div role="status" style={{position:'absolute',left:'50%',bottom:34,transform:'translateX(-50%)',background:C.text,color:toast.error?C.danger:C.bg,borderRadius:14,padding:'16px 26px',fontSize:18,fontWeight:700,display:'flex',alignItems:'center',gap:12,boxShadow:'0 16px 40px rgba(0,0,0,0.45)',whiteSpace:'nowrap',zIndex:20}}>
           <Icon name={toast.error?'warn':'check'} size={22}/>{toast.msg}
         </div>
       )}
