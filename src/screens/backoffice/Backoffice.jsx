@@ -90,15 +90,8 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <input ref={fileRef} type="file" accept=".csv" onChange={importCsv} style={{display:'none'}}/>
               <button onClick={()=>fileRef.current.click()} disabled={importing}
-                style={{height:36,padding:'0 14px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,color:C.textSub,fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center',gap:7,cursor:importing?'wait':'pointer',opacity:importing?0.6:1}}>
-                <Icon name="upload" size={14}/> {importing ? 'A importar...' : 'Importar Ementa'}
-              </button>
-              <button style={{height:36,padding:'0 14px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,color:C.textSub,fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center',gap:7,cursor:'pointer'}}>
-                <Icon name="history" size={14}/> Histórico
-              </button>
-              <div style={{width:1,height:24,background:C.border,margin:'0 4px'}}/>
-              <button onClick={reload} style={{height:36,padding:'0 16px',background:C.yellow,border:'none',borderRadius:99,color:C.bg,fontSize:13,fontWeight:700,display:'inline-flex',alignItems:'center',gap:8,cursor:'pointer'}}>
-                <Icon name="check" size={14} color={C.bg}/> Publicar semana
+                style={{height:36,padding:'0 16px',background:C.yellow,border:'none',borderRadius:99,color:C.bg,fontSize:13,fontWeight:700,display:'inline-flex',alignItems:'center',gap:8,cursor:importing?'wait':'pointer',opacity:importing?0.6:1}}>
+                <Icon name="upload" size={14} color={C.bg}/> {importing ? 'A importar...' : 'Importar Ementa'}
               </button>
             </div>
           )}
