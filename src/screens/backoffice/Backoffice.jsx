@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { supabase } from '../../lib/supabase'
+import { parseEmentaCsv, decodeCsv } from '../../utils/ementaCsv'
 import { C } from '../../constants/colors'
 import Icon from '../../components/Icon'
 import Logo from '../../components/Logo'
@@ -11,6 +13,30 @@ import SecDefinicoes from './SecDefinicoes'
 
 export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,visitantes,settings,reload,onBack}) {
   const [sec,setSec] = useState('ementas')
+  const [importing,setImporting] = useState(false)
+  const fileRef = useRef(null)
+
+  const importCsv = async e => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite reimportar o mesmo ficheiro
+    if (!file) return
+    setImporting(true)
+    try {
+      const {rows,skipped} = parseEmentaCsv(decodeCsv(await file.arrayBuffer()))
+      const skippedMsg = skipped.length
+        ? `\n${skipped.length} linhas descartadas (linhas ${skipped.slice(0,20).join(', ')}${skipped.length>20?', …':''})`
+        : '\nNenhuma linha descartada'
+      if (!rows.length) { alert(`Nenhuma refeição válida encontrada no ficheiro.${skippedMsg}`); return }
+      const {error} = await supabase.from('cantina_ementas').upsert(rows,{onConflict:'data,tipo'})
+      if (error) throw error
+      await reload()
+      alert(`${rows.length} refeições importadas${skippedMsg}`)
+    } catch (err) {
+      alert(`Erro ao importar ementa: ${err.message}`)
+    } finally {
+      setImporting(false)
+    }
+  }
   const nav = [
     {key:'ementas',   icon:'calendar', label:'Ementas'},
     {key:'funcs',     icon:'users',    label:'Funcionários'},
@@ -62,8 +88,10 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
           </div>
           {sec==='ementas' && (
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <button style={{height:36,padding:'0 14px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,color:C.textSub,fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center',gap:7,cursor:'pointer'}}>
-                <Icon name="copy" size={14}/> Templates
+              <input ref={fileRef} type="file" accept=".csv" onChange={importCsv} style={{display:'none'}}/>
+              <button onClick={()=>fileRef.current.click()} disabled={importing}
+                style={{height:36,padding:'0 14px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,color:C.textSub,fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center',gap:7,cursor:importing?'wait':'pointer',opacity:importing?0.6:1}}>
+                <Icon name="upload" size={14}/> {importing ? 'A importar...' : 'Importar Ementa'}
               </button>
               <button style={{height:36,padding:'0 14px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,color:C.textSub,fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center',gap:7,cursor:'pointer'}}>
                 <Icon name="history" size={14}/> Histórico
