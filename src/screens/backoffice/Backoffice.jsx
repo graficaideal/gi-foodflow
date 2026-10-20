@@ -4,7 +4,6 @@ import { parseEmentaCsv, decodeCsv } from '../../utils/ementaCsv'
 import { C } from '../../constants/colors'
 import Icon from '../../components/Icon'
 import Logo from '../../components/Logo'
-import { MN_FULL } from '../../utils/date'
 import SecEmentas from './SecEmentas'
 import SecFuncionarios from './SecFuncionarios'
 import SecConsumos from './SecConsumos'
@@ -44,16 +43,11 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
     {key:'marcacoes', icon:'list',     label:'Marcações'},
     {key:'definicoes',icon:'gear',     label:'Definições'},
   ]
-  const now = new Date()
-  const currentMonthLabel = `${MN_FULL[now.getMonth()]} ${now.getFullYear()}`
-
   return (
-    <div style={{minHeight:'100vh',display:'flex'}}>
+    <div style={{...(sec==='ementas'?{height:'100vh'}:{minHeight:'100vh'}),display:'flex'}}>
       {/* Rail */}
       <div style={{width:60,background:C.surface,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:14,flexShrink:0}}>
-        <div style={{width:36,height:36,borderRadius:9,background:C.yellow,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:22}}>
-          <Icon name="fork" size={20} color={C.bg}/>
-        </div>
+        <img src="/app_gestaocantinas_amarelo.png" alt="FoodFlow" width={36} height={36} style={{marginBottom:22,transform:'scale(1.6)'}}/>
         {nav.map(n => (
           <button key={n.key} title={n.label} onClick={()=>setSec(n.key)}
             style={{width:42,height:42,borderRadius:10,margin:'3px 0',display:'flex',alignItems:'center',justifyContent:'center',
@@ -73,29 +67,34 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
       {/* Main */}
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>
         {/* Topbar */}
-        <div style={{padding:'18px 32px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${C.border}`,background:C.surface,flexShrink:0}}>
-          <div style={{display:'flex',alignItems:'center',gap:22}}>
-            <Logo size="sm" showSub={false}/>
-            <div style={{width:1,height:28,background:C.border}}/>
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:C.textMuted,letterSpacing:'0.14em',textTransform:'uppercase'}}>
-                Backoffice · {nav.find(n=>n.key===sec)?.label}
-              </div>
-              <div style={{fontSize:28,lineHeight:1,color:C.text,marginTop:2}}>
-                {sec==='ementas' ? currentMonthLabel : nav.find(n=>n.key===sec)?.label}
+        {sec==='ementas' ? (
+          <div style={{height:60,flexShrink:0,background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{display:'flex',alignItems:'baseline',gap:10}}>
+              <span style={{fontSize:18,fontWeight:800,color:C.text}}>Ementas</span>
+              <span style={{fontSize:13,color:C.textMuted}}>FoodFlow · Backoffice</span>
+            </div>
+            <input ref={fileRef} type="file" accept=".csv" onChange={importCsv} style={{display:'none'}}/>
+            <button onClick={()=>fileRef.current.click()} disabled={importing}
+              style={{height:38,padding:'0 16px',background:C.yellow,border:'none',borderRadius:9,color:'#0d1117',fontSize:14,fontWeight:700,display:'inline-flex',alignItems:'center',gap:8,cursor:importing?'wait':'pointer',opacity:importing?0.6:1,fontFamily:'inherit'}}>
+              <Icon name="upload" size={16} color="#0d1117"/>{importing ? 'A importar...' : 'Importar Ementa'}
+            </button>
+          </div>
+        ) : (
+          <div style={{padding:'18px 32px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${C.border}`,background:C.surface,flexShrink:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:22}}>
+              <Logo size="sm" showSub={false}/>
+              <div style={{width:1,height:28,background:C.border}}/>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:C.textMuted,letterSpacing:'0.14em',textTransform:'uppercase'}}>
+                  Backoffice · {nav.find(n=>n.key===sec)?.label}
+                </div>
+                <div style={{fontSize:28,lineHeight:1,color:C.text,marginTop:2}}>
+                  {nav.find(n=>n.key===sec)?.label}
+                </div>
               </div>
             </div>
           </div>
-          {sec==='ementas' && (
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <input ref={fileRef} type="file" accept=".csv" onChange={importCsv} style={{display:'none'}}/>
-              <button onClick={()=>fileRef.current.click()} disabled={importing}
-                style={{height:36,padding:'0 16px',background:C.yellow,border:'none',borderRadius:99,color:C.bg,fontSize:13,fontWeight:700,display:'inline-flex',alignItems:'center',gap:8,cursor:importing?'wait':'pointer',opacity:importing?0.6:1}}>
-                <Icon name="upload" size={14} color={C.bg}/> {importing ? 'A importar...' : 'Importar Ementa'}
-              </button>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Content */}
         {sec==='ementas'

@@ -1,8 +1,6 @@
 import { C } from '../constants/colors'
-import { pratoColors } from '../constants/pratos'
+import { pratoColors, PRATO_GLYPHS as GLYPH } from '../constants/pratos'
 import Icon from './Icon'
-
-const GLYPH = ['flame','fish','salad','leaf']   // por slot, tal como a cor
 
 export default function PratoCard({slot,label,desc,selected,dim,locked,compact,onClick}) {
   const p = pratoColors(slot)
