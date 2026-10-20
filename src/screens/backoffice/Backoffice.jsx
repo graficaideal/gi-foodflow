@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabase'
 import { parseEmentaCsv, decodeCsv } from '../../utils/ementaCsv'
 import { C } from '../../constants/colors'
 import Icon from '../../components/Icon'
-import Logo from '../../components/Logo'
 import SecEmentas from './SecEmentas'
 import SecFuncionarios from './SecFuncionarios'
 import SecConsumos from './SecConsumos'
@@ -67,34 +66,19 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
       {/* Main */}
       <div style={{flex:1,display:'flex',flexDirection:'column',background:C.bg,overflow:'hidden'}}>
         {/* Topbar */}
-        {sec==='ementas' ? (
-          <div style={{height:60,flexShrink:0,background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <div style={{display:'flex',alignItems:'baseline',gap:10}}>
-              <span style={{fontSize:18,fontWeight:800,color:C.text}}>Ementas</span>
-              <span style={{fontSize:13,color:C.textMuted}}>FoodFlow · Backoffice</span>
-            </div>
+        <div style={{height:60,flexShrink:0,background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'baseline',gap:10}}>
+            <span style={{fontSize:18,fontWeight:800,color:C.text}}>{nav.find(n=>n.key===sec)?.label}</span>
+            <span style={{fontSize:13,color:C.textMuted}}>FoodFlow · Backoffice</span>
+          </div>
+          {sec==='ementas' && (<>
             <input ref={fileRef} type="file" accept=".csv" onChange={importCsv} style={{display:'none'}}/>
             <button onClick={()=>fileRef.current.click()} disabled={importing}
               style={{height:38,padding:'0 16px',background:C.yellow,border:'none',borderRadius:9,color:'#0d1117',fontSize:14,fontWeight:700,display:'inline-flex',alignItems:'center',gap:8,cursor:importing?'wait':'pointer',opacity:importing?0.6:1,fontFamily:'inherit'}}>
               <Icon name="upload" size={16} color="#0d1117"/>{importing ? 'A importar...' : 'Importar Ementa'}
             </button>
-          </div>
-        ) : (
-          <div style={{padding:'18px 32px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${C.border}`,background:C.surface,flexShrink:0}}>
-            <div style={{display:'flex',alignItems:'center',gap:22}}>
-              <Logo size="sm" showSub={false}/>
-              <div style={{width:1,height:28,background:C.border}}/>
-              <div>
-                <div style={{fontSize:11,fontWeight:700,color:C.textMuted,letterSpacing:'0.14em',textTransform:'uppercase'}}>
-                  Backoffice · {nav.find(n=>n.key===sec)?.label}
-                </div>
-                <div style={{fontSize:28,lineHeight:1,color:C.text,marginTop:2}}>
-                  {nav.find(n=>n.key===sec)?.label}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+          </>)}
+        </div>
 
         {/* Content */}
         {sec==='ementas'
