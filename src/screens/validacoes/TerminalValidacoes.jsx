@@ -13,6 +13,7 @@ import LoginShell, { ARR } from '../../components/LoginShell'
 import PratoTag from '../../components/PratoTag'
 import PratoBtn from '../../components/PratoBtn'
 import useSerial from '../../hooks/useSerial'
+import { refeicoesPorMarcar } from '../../utils/marcar'
 
 // Cores específicas dos takeovers deste ecrã — não são tokens globais
 const V = {
@@ -63,6 +64,12 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
   const [desmarcarFunc,     setDesmarcarFunc]     = useState(null)
   const [desmarcarMarcs,    setDesmarcarMarcs]     = useState(null) // null = não carregado ainda
   const [desmarcarConfirm,  setDesmarcarConfirm]   = useState(null) // marcação pendente de confirmação
+  const [showMarcar,  setShowMarcar]  = useState(false)
+  const [marcarNum,   setMarcarNum]   = useState('')
+  const [marcarFunc,  setMarcarFunc]  = useState(null)  // null = por pesquisar, false = não encontrado
+  const [marcarRefs,  setMarcarRefs]  = useState(null)  // ementas de hoje por marcar; null = a carregar
+  const [marcarEm,    setMarcarEm]    = useState(null)  // ementa escolhida, à espera do prato
+  const [marcarErro,  setMarcarErro]  = useState('')
 
   // Relógio: reavalia getMeal() periodicamente
   useEffect(() => {
@@ -330,6 +337,49 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
     return () => window.removeEventListener('keydown',h)
   }, [showDesmarcar, desmarcarFunc, desmarcarPesquisa])
 
+  const fecharMarcar = () => {
+    setShowMarcar(false); setMarcarNum(''); setMarcarFunc(null); setMarcarRefs(null); setMarcarEm(null); setMarcarErro('')
+  }
+
+  // Editar o número limpa o "não encontrado" anterior
+  const digitarMarcar = fn => { setMarcarNum(fn); setMarcarFunc(null) }
+
+  const executarPesquisaMarcar = async () => {
+    const num = marcarNum.trim()
+    if(!num) return
+    const func = funcionarios.find(f=>f.ativo && f.numero===num)
+    if(!func){ setMarcarFunc(false); return }
+    setMarcarFunc(func)
+    setMarcarRefs(null)
+    const emsHoje = ementas.filter(e=>e.data===TODAY)
+    const {data} = emsHoje.length===0 ? {data:[]} : await supabase.from('cantina_marcacoes').select('ementa_id').eq('funcionario_id',func.id).in('ementa_id',emsHoje.map(e=>e.id))
+    setMarcarRefs(refeicoesPorMarcar(emsHoje, data||[], TODAY))
+  }
+
+  const marcarPrato = async n => {
+    const em = marcarEm
+    const {error} = await supabase.from('cantina_marcacoes').upsert({funcionario_id:marcarFunc.id,ementa_id:em.id,prato_num:n},{onConflict:'funcionario_id,ementa_id'})
+    if(error){ setMarcarErro('Não foi possível gravar a marcação. Tenta novamente.'); return }
+    loadContadores(ementaAtual)
+    const restantes = marcarRefs.filter(e=>e.id!==em.id)
+    if(restantes.length===0){ fecharMarcar(); return }
+    setMarcarRefs(restantes); setMarcarEm(null); setMarcarErro('')
+  }
+
+  // Teclado físico ativo enquanto o modal Marcar está aberto
+  useEffect(() => {
+    if(!showMarcar) return
+    const h = e => {
+      if(e.key==='Escape'){ fecharMarcar(); return }
+      if(marcarFunc) return // fora do passo de pesquisa
+      if(e.key>='0'&&e.key<='9'){ digitarMarcar(p=>p.length<10?p+e.key:p); return }
+      if(e.key==='Backspace'){ digitarMarcar(p=>p.slice(0,-1)); return }
+      if(e.key==='Enter'){ executarPesquisaMarcar(); return }
+    }
+    window.addEventListener('keydown',h)
+    return () => window.removeEventListener('keydown',h)
+  }, [showMarcar, marcarFunc, marcarNum])
+
   const process = useCallback(async (val,isRfid=false) => {
     const v = val.replace(/[^\x21-\x7E]/g,'').trim(); if(!v) return
     // Verifica horário em tempo real via s (sempre a prop atualizada)
@@ -355,7 +405,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
   // HID fallback
   const rfidRef=useRef(''); const rfidTimer=useRef(null)
   useEffect(() => {
-    if(status?.type==='no-marc') return
+    if(status?.type==='no-marc' || showMarcar || showDesmarcar) return // modais com teclado próprio
     const h = e => {
       if(e.key==='Enter'){if(rfidRef.current){process(rfidRef.current,true);rfidRef.current=''}return}
       if(e.key.length!==1) return
@@ -364,7 +414,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
     }
     window.addEventListener('keydown',h)
     return()=>{window.removeEventListener('keydown',h);clearTimeout(rfidTimer.current)}
-  },[status,process])
+  },[status,process,showMarcar,showDesmarcar])
 
   const next = getNextMeal(s)
 
@@ -439,7 +489,8 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
             : navigator.serial
             ? <button onClick={connectSerial} style={{fontSize:12,fontWeight:600,color:C.yellow,background:C.yellow+'18',border:`1px solid ${C.yellow}55`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>{serialStatus==='error'?'⚠ Religar':'Conectar leitor'}</button>
             : null}
-          <button onClick={()=>setShowMarc(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Marcações</button>
+          <button onClick={()=>setShowMarc(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Imprimir</button>
+          <button onClick={()=>setShowMarcar(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Marcar</button>
           <button onClick={()=>setShowDesmarcar(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Desmarcar</button>
           {!isKiosk && (
             <button onClick={onBack} style={{background:'none',border:'none',color:C.textMuted,fontSize:13,cursor:'pointer'}}>← Sair</button>
@@ -924,6 +975,85 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
           </div>
         )
       })()}
+      {showMarcar && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:480,maxWidth:'92vw',maxHeight:'90vh',background:V.panel,border:`1px solid ${C.border}`,borderRadius:20,padding:28,display:'flex',flexDirection:'column',gap:18}}>
+            <div style={{fontSize:22,fontWeight:700,color:C.text,flexShrink:0}}>Marcar</div>
+
+            {!marcarFunc ? (
+              <>
+                <div style={{background:ARR.card,border:`1px solid ${ARR.border}`,borderRadius:14,height:56,display:'flex',alignItems:'center',padding:'0 16px',flexShrink:0}}>
+                  <span style={{fontSize:22,letterSpacing:2,color:marcarNum?C.text:C.textMuted}}>{marcarNum || 'Número do funcionário'}</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,flexShrink:0}}>
+                  {[1,2,3,4,5,6,7,8,9].map(d => (
+                    <button key={d} onClick={()=>digitarMarcar(p=>p.length<10?p+String(d):p)}
+                      style={{height:56,fontSize:20,fontWeight:600,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,cursor:'pointer'}}>{d}</button>
+                  ))}
+                  <button onClick={()=>digitarMarcar(p=>p.slice(0,-1))}
+                    style={{height:56,fontSize:18,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,color:C.textSub,cursor:'pointer'}}>⌫</button>
+                  <button onClick={()=>digitarMarcar(p=>p.length<10?p+'0':p)}
+                    style={{height:56,fontSize:20,fontWeight:600,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,cursor:'pointer'}}>0</button>
+                  <button onClick={executarPesquisaMarcar}
+                    style={{height:56,fontSize:14,fontWeight:700,background:C.yellow,border:'none',borderRadius:12,color:C.bg,cursor:'pointer'}}>↵ ENTER</button>
+                </div>
+                {marcarFunc===false && (
+                  <div style={{padding:12,textAlign:'center',color:C.danger,fontSize:14,fontWeight:600}}>Funcionário não encontrado</div>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
+                  <Avatar nome={marcarFunc.nome} foto={marcarFunc.foto} size={40}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:15,fontWeight:700,color:C.text}}>{marcarFunc.nome}</div>
+                    <div style={{fontSize:12,color:C.textMuted}}>Nº {marcarFunc.numero}</div>
+                  </div>
+                  <button onClick={()=>{setMarcarFunc(null);setMarcarRefs(null);setMarcarEm(null);setMarcarErro('')}}
+                    style={{marginLeft:'auto',fontSize:12,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 12px',cursor:'pointer'}}>
+                    Trocar
+                  </button>
+                </div>
+                <div style={{flex:1,minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column',gap:10}}>
+                  {marcarRefs===null
+                    ? <div style={{padding:24,textAlign:'center',color:C.textMuted,fontSize:13}}>A carregar…</div>
+                    : marcarRefs.length===0
+                    ? <div style={{padding:24,textAlign:'center',color:C.textMuted,fontSize:13}}>Todas as refeições de hoje já estão marcadas</div>
+                    : !marcarEm
+                    ? <div style={{display:'flex',gap:10}}>
+                        {marcarRefs.map(em => (
+                          <button key={em.id} onClick={()=>setMarcarEm(em)}
+                            style={{flex:1,minHeight:64,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:16,fontWeight:700,cursor:'pointer'}}>
+                            {em.tipo==='A'?'Almoço':'Jantar'}
+                          </button>
+                        ))}
+                      </div>
+                    : <>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                          <div style={{fontSize:12,fontWeight:700,color:C.textMuted,letterSpacing:'0.14em',textTransform:'uppercase'}}>{marcarEm.tipo==='A'?'Almoço':'Jantar'} · escolhe o prato</div>
+                          <button onClick={()=>{setMarcarEm(null);setMarcarErro('')}}
+                            style={{fontSize:12,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 12px',cursor:'pointer'}}>
+                            Voltar
+                          </button>
+                        </div>
+                        {[1,2,3,4].map(n => {
+                          const label = marcarEm[`prato${n}_label`]
+                          if(!label) return null
+                          return <PratoBtn key={n} slot={n} label={label} desc={marcarEm[`prato${n}_desc`]} onClick={()=>marcarPrato(n)}/>
+                        })}
+                      </>}
+                  {marcarErro && <div style={{textAlign:'center',color:C.danger,fontSize:13,fontWeight:600}}>{marcarErro}</div>}
+                </div>
+              </>
+            )}
+
+            <button onClick={fecharMarcar}
+              style={{width:'100%',minHeight:56,flexShrink:0,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,color:C.textSub,fontSize:15,fontWeight:600,cursor:'pointer'}}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       {desmarcarConfirm && (
         <div onClick={()=>setDesmarcarConfirm(null)}
           style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:1100,display:'flex',alignItems:'center',justifyContent:'center'}}>
