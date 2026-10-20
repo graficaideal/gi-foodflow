@@ -246,7 +246,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
       .total { font-weight:bold; margin-top:6px; }
       table.totais td.num { text-align:right; font-weight:700; }
     </style></head><body>
-      <div class="titulo">GI FOODFLOW</div>
+      <div class="titulo">FOODFLOW</div>
       <div class="sep"></div>
       <div>Impresso: ${agoraStr}</div>
       <div>${periodoLabel} · ${refeicaoLabel}</div>
