@@ -11,7 +11,14 @@
       "Bash(git push *)",
       "PowerShell(npm run *)",
       "PowerShell(git *)",
-      "PowerShell(gh auth *)"
+      "PowerShell(gh auth *)",
+      "Bash(git *)",
+      "mcp__plugin_supabase_supabase__list_tables",
+      "mcp__plugin_supabase_supabase__apply_migration",
+      "Bash(gh pr create --title 'Suporte a consumos de visitantes' --body ' *)",
+      "PowerShell(gh pr *)",
+      "Bash(gh --version)",
+      "Read(//c/Program Files/**)"
     ]
   }
 }
