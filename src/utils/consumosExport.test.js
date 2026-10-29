@@ -11,24 +11,24 @@ test('exportRows: agrupa por funcionário, ordena por Nº numérico, visitantes 
     c('12', 'Ana', 'A'), c('12', 'Ana', 'A'), vis('J', 4), vis('A', 2),
   ])
   assert.deepEqual(rows, [
-    ['12',  'Ana',        2, 1, 3, 0],
-    ['169', 'Bruno',      1, 1, 2, 1],
-    ['',    'Visitantes', 2, 4, 6, 0],
-    ['',    'TOTAL',      5, 6, 11, 1],
+    ['12',  'Ana',        2, 1, 3],
+    ['169', 'Bruno',      1, 1, 2],
+    ['',    'Visitantes', 2, 4, 6],
+    ['',    'TOTAL',      5, 6, 11],
   ])
   assert.equal(rows[0].length, HEADERS.length)
 })
 
 test('exportRows: sem visitantes não cria a linha; vazio dá só TOTAL a zeros', () => {
   assert.deepEqual(exportRows([c('5', 'Rui', 'A')]).map(r => r[1]), ['Rui', 'TOTAL'])
-  assert.deepEqual(exportRows([]), [['', 'TOTAL', 0, 0, 0, 0]])
+  assert.deepEqual(exportRows([]), [['', 'TOTAL', 0, 0, 0]])
 })
 
 test('exportSummary: período, refeição, estado e totais; datas vazias não rebentam', () => {
   const stats = {total:5, a:1, j:4, funcionarios:1, visitantes:4, naoConsumidos:2}
   const s = exportSummary({fStart:'2026-10-01', fEnd:'2026-10-31', fMeal:'J', fEstado:'N', stats})
   assert.deepEqual(s.slice(0, 2), ['Período: 01/10/2026 a 31/10/2026', 'Refeição: Jantar · Estado: Não consumidos'])
-  assert.match(s[2], /2 não consumidos$/)
+  assert.doesNotMatch(s[2], /não consumidos/)
   assert.match(exportSummary({fStart:'', fEnd:'', fMeal:'', fEstado:'', stats})[0], /…/)
 })
 

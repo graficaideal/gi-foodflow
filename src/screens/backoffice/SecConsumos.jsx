@@ -74,7 +74,7 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     }
     const XLSX = await import('xlsx')   // ponytail: carregado só ao exportar (~400 KB)
     const ws = XLSX.utils.aoa_to_sheet([...summary.map(s => [s]), [], HEADERS, ...rows])
-    ws['!cols'] = [6, 30, 10, 10, 8, 15].map(wch => ({wch}))
+    ws['!cols'] = [6, 30, 10, 10, 8].map(wch => ({wch}))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Consumos')
     XLSX.writeFile(wb, `consumos_por_funcionario_${fStart||'inicio'}_${fEnd||'fim'}.xlsx`)

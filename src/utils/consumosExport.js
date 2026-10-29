@@ -1,27 +1,26 @@
-export const HEADERS = ['Nº', 'Nome', 'Almoços', 'Jantares', 'Total', 'Não consumidos']
+export const HEADERS = ['Nº', 'Nome', 'Almoços', 'Jantares', 'Total']
 const NUM = 2   // colunas a partir desta são numéricas
 
 const dmy = s => s.split('-').reverse().join('/')
 const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-// Agrupa as linhas visíveis (já filtradas) por funcionário: almoços, jantares, total, não consumidos.
+// Agrupa as linhas visíveis (já filtradas) por funcionário: almoços, jantares e total.
 // Visitantes numa linha própria e TOTAL no fim (sempre a última linha).
 export const exportRows = sorted => {
   const by = new Map(), vis = {a:0, j:0}
   for (const c of sorted) {
     const k = c.tipo === 'A' ? 'a' : 'j'
     if (!c.nome) { vis[k] += c.quantidade; continue }
-    const g = by.get(c.numero) || {numero:c.numero, nome:c.nome, a:0, j:0, nc:0}
+    const g = by.get(c.numero) || {numero:c.numero, nome:c.nome, a:0, j:0}
     g[k] += c.quantidade
-    if (c.automatico) g.nc++
     by.set(c.numero, g)
   }
   const rows = [...by.values()]
     .sort((x, y) => String(x.numero).localeCompare(String(y.numero), undefined, {numeric:true}))
-    .map(g => [g.numero, g.nome, g.a, g.j, g.a + g.j, g.nc])
-  if (vis.a + vis.j) rows.push(['', 'Visitantes', vis.a, vis.j, vis.a + vis.j, 0])
+    .map(g => [g.numero, g.nome, g.a, g.j, g.a + g.j])
+  if (vis.a + vis.j) rows.push(['', 'Visitantes', vis.a, vis.j, vis.a + vis.j])
   const sum = i => rows.reduce((s, r) => s + r[i], 0)
-  rows.push(['', 'TOTAL', sum(2), sum(3), sum(4), sum(5)])
+  rows.push(['', 'TOTAL', sum(2), sum(3), sum(4)])
   return rows
 }
 
@@ -29,7 +28,7 @@ export const exportRows = sorted => {
 export const exportSummary = ({fStart, fEnd, fMeal, fEstado, stats}) => [
   `Período: ${fStart ? dmy(fStart) : '…'} a ${fEnd ? dmy(fEnd) : '…'}`,
   `Refeição: ${fMeal === 'A' ? 'Almoço' : fMeal === 'J' ? 'Jantar' : 'Todas'} · Estado: ${fEstado === 'C' ? 'Consumidos' : fEstado === 'N' ? 'Não consumidos' : 'Todos'}`,
-  `${stats.total} consumos · ${stats.a} almoços · ${stats.j} jantares · ${stats.funcionarios} funcionários · ${stats.visitantes} visitantes · ${stats.naoConsumidos} não consumidos`,
+  `${stats.total} consumos · ${stats.a} almoços · ${stats.j} jantares · ${stats.funcionarios} funcionários · ${stats.visitantes} visitantes`,
 ]
 
 export const printHtml = (rows, summary) => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Consumos</title><style>
