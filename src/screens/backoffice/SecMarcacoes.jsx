@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { C } from '../../constants/colors'
-import { FIRST_MONTH, LAST_MONTH, TODAY, fmtS } from '../../utils/date'
+import { monthRange, fmtS } from '../../utils/date'
+import { matchFunc } from '../../utils/text'
 import Avatar from '../../components/Avatar'
 import PratoTag from '../../components/PratoTag'
 import KpiLine from '../../components/KpiLine'
+import { PeriodFilter, SearchInput, pill } from '../../components/Filters'
 
 const TH   = {fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.1em'}
 
 export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
-  const [fStart, setFStart] = useState(FIRST_MONTH())
-  const [fEnd,   setFEnd]   = useState(LAST_MONTH())
+  const [[fStart, fEnd], setPeriod] = useState(() => monthRange(0))
   const [fMeal,  setFMeal]  = useState('')
+  const [q,      setQ]      = useState('')
   const [view,   setView]   = useState('funcionario')
 
   const enriched = marcacoes.map(m => {
@@ -24,41 +26,31 @@ export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
   const filtered = enriched.filter(m =>
     (!fStart || m.data >= fStart) &&
     (!fEnd   || m.data <= fEnd)   &&
-    (!fMeal  || m.tipo === fMeal)
+    (!fMeal  || m.tipo === fMeal) &&
+    matchFunc(q, m)
   )
   const stats   = {total:filtered.length, a:filtered.filter(m=>m.tipo==='A').length, j:filtered.filter(m=>m.tipo==='J').length}
   const byFunc  = [...filtered].sort((a, b) => a.nome.localeCompare(b.nome, 'pt') || (a.data < b.data ? -1 : 1))
   const byDate  = tipo => [...filtered].filter(m => m.tipo === tipo).sort((a, b) => a.data < b.data ? -1 : a.data > b.data ? 1 : a.nome.localeCompare(b.nome, 'pt'))
 
-  const pill = {height:34,padding:'0 14px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:99,color:C.text,fontSize:12,outline:'none',cursor:'pointer'}
-
   return (
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minHeight:0}}>
 
       {/* ── Toolbar ── */}
-      <div style={{padding:'14px 32px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+      <div style={{padding:'14px 32px',display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:'10px 24px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
 
         {/* Stats */}
         <KpiLine items={[{value:stats.total,label:'marcações'},{value:stats.a,label:'almoços'},{value:stats.j,label:'jantares'}]}/>
 
         {/* Filters + view toggle */}
-        <div style={{display:'flex',alignItems:'center',gap:6}}>
-          <input type="date" value={fStart} onChange={e => setFStart(e.target.value)} style={{...pill,width:134}}/>
-          <span style={{fontSize:11,color:C.textMuted}}>→</span>
-          <input type="date" value={fEnd}   onChange={e => setFEnd(e.target.value)}   style={{...pill,width:134}}/>
+        <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:6}}>
+          <PeriodFilter start={fStart} end={fEnd} onChange={(a,b) => setPeriod([a,b])}/>
+          <SearchInput value={q} onChange={setQ}/>
           <select value={fMeal} onChange={e => setFMeal(e.target.value)} style={{...pill,width:112}}>
             <option value="">Todas</option>
             <option value="A">Almoço</option>
             <option value="J">Jantar</option>
           </select>
-          <button onClick={() => {setFStart(TODAY);setFEnd(TODAY)}}
-            style={{...pill,color:C.yellow,border:`1px solid ${C.yellow}44`,background:'transparent',fontWeight:700}}>
-            Hoje
-          </button>
-          <button onClick={() => {setFStart(FIRST_MONTH());setFEnd(LAST_MONTH());setFMeal('')}}
-            style={{...pill,padding:'0 12px',color:C.textMuted,background:'transparent',border:`1px solid ${C.border}`}}>
-            Limpar
-          </button>
           <div style={{width:1,height:24,background:C.border,margin:'0 4px'}}/>
           {/* View toggle */}
           <div style={{display:'flex',background:C.surface2,border:`1px solid ${C.border}`,borderRadius:99,padding:3,gap:3}}>

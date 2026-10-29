@@ -37,3 +37,9 @@ test('printHtml: escapa HTML dos nomes e destaca a linha TOTAL', () => {
   assert.ok(html.includes('Ana &lt;Silva&gt;') && !html.includes('<Silva>'))
   assert.equal((html.match(/<tr class="total">/g) || []).length, 1)
 })
+
+test('exportSummary: indica a pesquisa quando há texto', () => {
+  const stats = {total:0, a:0, j:0, funcionarios:0, visitantes:0}
+  assert.match(exportSummary({fStart:'', fEnd:'', fMeal:'', fEstado:'', q:' joao ', stats})[1], / · Pesquisa: "joao"$/)
+  assert.doesNotMatch(exportSummary({fStart:'', fEnd:'', fMeal:'', fEstado:'', q:'', stats})[1], /Pesquisa/)
+})

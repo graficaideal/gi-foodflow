@@ -1,8 +1,8 @@
 export const d2s = d => { const x=d instanceof Date?d:new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` }
 export const addD = (s,n) => { const d=new Date(s+'T12:00:00'); d.setDate(d.getDate()+n); return d2s(d) }
 export const TODAY = d2s(new Date())
-export const FIRST_MONTH = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01` }
-export const LAST_MONTH  = (d=new Date()) => d2s(new Date(d.getFullYear(), d.getMonth()+1, 0))
+// [início, fim] do mês atual (offset 0), anterior (-1), …
+export const monthRange = (offset=0, d=new Date()) => [d2s(new Date(d.getFullYear(), d.getMonth()+offset, 1)), d2s(new Date(d.getFullYear(), d.getMonth()+offset+1, 0))]
 
 export const WD      = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 export const WD_FULL = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado']

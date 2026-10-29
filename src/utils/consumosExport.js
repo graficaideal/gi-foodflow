@@ -25,9 +25,9 @@ export const exportRows = sorted => {
 }
 
 // Linhas de contexto: período, filtros e totais
-export const exportSummary = ({fStart, fEnd, fMeal, fEstado, stats}) => [
+export const exportSummary = ({fStart, fEnd, fMeal, fEstado, q, stats}) => [
   `Período: ${fStart ? dmy(fStart) : '…'} a ${fEnd ? dmy(fEnd) : '…'}`,
-  `Refeição: ${fMeal === 'A' ? 'Almoço' : fMeal === 'J' ? 'Jantar' : 'Todas'} · Estado: ${fEstado === 'C' ? 'Consumidos' : fEstado === 'N' ? 'Não consumidos' : 'Todos'}`,
+  `Refeição: ${fMeal === 'A' ? 'Almoço' : fMeal === 'J' ? 'Jantar' : 'Todas'} · Estado: ${fEstado === 'C' ? 'Consumidos' : fEstado === 'N' ? 'Não consumidos' : 'Todos'}${q?.trim() ? ` · Pesquisa: "${q.trim()}"` : ''}`,
   `${stats.total} consumos · ${stats.a} almoços · ${stats.j} jantares · ${stats.funcionarios} funcionários · ${stats.visitantes} visitantes`,
 ]
 

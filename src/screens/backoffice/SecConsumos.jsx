@@ -1,19 +1,21 @@
 import { useState } from 'react'
 import { C } from '../../constants/colors'
-import { FIRST_MONTH, LAST_MONTH, TODAY, fmtS, fmtHM } from '../../utils/date'
+import { monthRange, fmtS, fmtHM } from '../../utils/date'
+import { matchFunc } from '../../utils/text'
 import Avatar from '../../components/Avatar'
 import PratoTag from '../../components/PratoTag'
 import Icon from '../../components/Icon'
 import KpiLine from '../../components/KpiLine'
+import { PeriodFilter, SearchInput, pill } from '../../components/Filters'
 import { HEADERS, exportRows, exportSummary, printHtml } from '../../utils/consumosExport'
 
 const COLS = '1fr 120px 95px 105px 60px 72px'
 const TH   = {fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.1em'}
 
 export default function SecConsumos({consumos, visitantes=[], funcionarios, ementas}) {
-  const [fStart, setFStart] = useState(FIRST_MONTH())
-  const [fEnd,   setFEnd]   = useState(LAST_MONTH())
+  const [[fStart, fEnd], setPeriod] = useState(() => monthRange(0))
   const [fMeal,  setFMeal]  = useState('')
+  const [q,      setQ]      = useState('')
   const [fEstado,setFEstado]= useState('')   // '' | 'C' consumidos | 'N' não consumidos (automatico)
 
   const enriched = consumos.map(c => {
@@ -28,7 +30,8 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     (!fStart || c.data >= fStart) &&
     (!fEnd   || c.data <= fEnd)   &&
     (!fMeal  || c.tipo === fMeal) &&
-    (!fEstado || (fEstado === 'N') === !!c.automatico)
+    (!fEstado || (fEstado === 'N') === !!c.automatico) &&
+    matchFunc(q, c)
   )
 
   const enrichedVisitantes = visitantes.map(v => {
@@ -42,7 +45,8 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     (!fStart || v.data >= fStart) &&
     (!fEnd   || v.data <= fEnd)   &&
     (!fMeal  || v.tipo === fMeal) &&
-    fEstado !== 'N'   // visitantes contam sempre como consumidos
+    fEstado !== 'N' &&   // visitantes contam sempre como consumidos
+    !q.trim()            // e não têm nome: saem ao pesquisar
   )
 
   const sorted = [
@@ -63,7 +67,7 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
   }
 
   const exportar = async formato => {
-    const rows = exportRows(sorted), summary = exportSummary({fStart,fEnd,fMeal,fEstado,stats})
+    const rows = exportRows(sorted), summary = exportSummary({fStart,fEnd,fMeal,fEstado,q,stats})
     if (formato === 'pdf') {
       const win = window.open('', '_blank')
       if (!win) return
@@ -80,22 +84,19 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     XLSX.writeFile(wb, `consumos_por_funcionario_${fStart||'inicio'}_${fEnd||'fim'}.xlsx`)
   }
 
-  const pill = {height:34,padding:'0 14px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:99,color:C.text,fontSize:12,outline:'none',cursor:'pointer'}
-
   return (
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minHeight:0}}>
 
       {/* ── Toolbar ── */}
-      <div style={{padding:'14px 32px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:24,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+      <div style={{padding:'14px 32px',display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:'10px 24px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
 
         {/* Stats */}
         <KpiLine items={[{value:stats.total,label:'consumos'},{value:stats.a,label:'almoços'},{value:stats.j,label:'jantares'},{value:stats.funcionarios,label:'funcionários'},{value:stats.visitantes,label:'visitantes'},{value:stats.naoConsumidos,label:'não consumidos'}]}/>
 
         {/* Filters */}
-        <div style={{display:'flex',alignItems:'center',gap:6}}>
-          <input type="date" value={fStart} onChange={e => setFStart(e.target.value)} style={{...pill,width:134}}/>
-          <span style={{fontSize:11,color:C.textMuted}}>→</span>
-          <input type="date" value={fEnd}   onChange={e => setFEnd(e.target.value)}   style={{...pill,width:134}}/>
+        <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:6}}>
+          <PeriodFilter start={fStart} end={fEnd} onChange={(a,b) => setPeriod([a,b])}/>
+          <SearchInput value={q} onChange={setQ}/>
           <select value={fMeal} onChange={e => setFMeal(e.target.value)} style={{...pill,width:128}}>
             <option value="">Todas</option>
             <option value="A">Almoço</option>
@@ -106,14 +107,6 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
             <option value="C">Consumidos</option>
             <option value="N">Não consumidos</option>
           </select>
-          <button onClick={() => {setFStart(TODAY);setFEnd(TODAY)}}
-            style={{...pill,color:C.yellow,border:`1px solid ${C.yellow}44`,background:'transparent',fontWeight:700}}>
-            Hoje
-          </button>
-          <button onClick={() => {setFStart(FIRST_MONTH());setFEnd(LAST_MONTH());setFMeal('');setFEstado('')}}
-            style={{...pill,padding:'0 12px',color:C.textMuted,background:'transparent',border:`1px solid ${C.border}`}}>
-            Limpar
-          </button>
           {['pdf','xlsx'].map(f => (
             <button key={f} onClick={() => exportar(f)} disabled={!sorted.length}
               style={{...pill,padding:'0 12px',color:C.textSub,background:'transparent',display:'inline-flex',alignItems:'center',gap:6,opacity:sorted.length?1:0.4,cursor:sorted.length?'pointer':'default'}}>
