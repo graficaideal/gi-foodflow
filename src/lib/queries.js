@@ -31,18 +31,6 @@ export const deleteConsumo = async (id) =>
 export const deleteVisitante = async (id) =>
   supabase.from('cantina_visitantes').delete().eq('id', id)
 
-export const fetchMarcacoesSemConsumo = async (ementa_id) => {
-  const { data } = await supabase
-    .from('cantina_marcacoes')
-    .select('*')
-    .eq('ementa_id', ementa_id)
-  // filtragem local dos que já têm consumo é feita no componente
-  return data || []
-}
-
-export const insertConsumoBatch = async (registos) =>
-  supabase.from('cantina_consumos').insert(registos)
-
 export const deleteMarcacao = async (id) =>
   supabase.from('cantina_marcacoes').delete().eq('id', id)
 

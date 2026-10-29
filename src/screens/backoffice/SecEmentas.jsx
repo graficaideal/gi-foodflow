@@ -174,15 +174,15 @@ export default function SecEmentas({ementas,reload,marcacoesAll=[],settings}) {
   const weekFilled = stats.reduce((a,x,i) => a + (open[i] ? x.filled : 0), 0)
   const weekTotal  = stats.reduce((a,x,i) => a + (open[i] ? x.total : 0), 0)
 
-  const navBtn = {width:34,height:34,borderRadius:9,background:C.surface,border:`1px solid ${C.border}`,color:C.textSub,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}
+  const navBtn = {width:40,height:40,padding:0,borderRadius:10,background:C.surface,border:`1px solid ${C.border}`,color:C.textSub,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}
 
   return (
     <div style={{flex:1,minHeight:0,display:'flex',flexDirection:'column'}}>
       {/* Toolbar da semana */}
       <div style={{height:60,flexShrink:0,padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${SUBTLE}`}}>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <button title="Semana anterior" onClick={()=>setWeekOffset(o=>o-1)} style={navBtn}><Icon name="chev-l" size={16}/></button>
-          <button title="Semana seguinte" onClick={()=>setWeekOffset(o=>o+1)} style={navBtn}><Icon name="chev-r" size={16}/></button>
+          <button type="button" aria-label="Semana anterior" onClick={()=>setWeekOffset(o=>o-1)} style={navBtn}><Icon name="chev-l" size={18}/></button>
+          <button type="button" aria-label="Semana seguinte" onClick={()=>setWeekOffset(o=>o+1)} style={navBtn}><Icon name="chev-r" size={18}/></button>
           <span style={{fontSize:17,fontWeight:700,marginLeft:6,color:C.text}}>Semana {isoWeekNum(days[0])}</span>
           <span style={{fontSize:15,color:C.textSub}}>{fmtRange(days)}</span>
         </div>

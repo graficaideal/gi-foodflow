@@ -1,28 +1,20 @@
 import { useState } from 'react'
 import { C } from '../../constants/colors'
-import { FIRST_MONTH, TODAY, fmtS, fmtHM } from '../../utils/date'
+import { FIRST_MONTH, LAST_MONTH, TODAY, fmtS, fmtHM } from '../../utils/date'
 import Avatar from '../../components/Avatar'
 import PratoTag from '../../components/PratoTag'
 import Icon from '../../components/Icon'
+import KpiLine from '../../components/KpiLine'
+import { HEADERS, exportRows, exportSummary, printHtml } from '../../utils/consumosExport'
 
-const EYE  = {fontSize:11,fontWeight:700,color:'#64748b',letterSpacing:'0.14em',textTransform:'uppercase',marginBottom:2}
-const BIG  = {fontStyle:'italic',fontSize:26,color:'#e2e8f0',lineHeight:1}
 const COLS = '1fr 120px 95px 105px 60px 72px'
 const TH   = {fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.1em'}
 
-function StatCard({label, value}) {
-  return (
-    <div style={{flex:1,minWidth:100,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 16px'}}>
-      <div style={EYE}>{label}</div>
-      <div style={BIG}>{value}</div>
-    </div>
-  )
-}
-
 export default function SecConsumos({consumos, visitantes=[], funcionarios, ementas}) {
   const [fStart, setFStart] = useState(FIRST_MONTH())
-  const [fEnd,   setFEnd]   = useState(TODAY)
+  const [fEnd,   setFEnd]   = useState(LAST_MONTH())
   const [fMeal,  setFMeal]  = useState('')
+  const [fEstado,setFEstado]= useState('')   // '' | 'C' consumidos | 'N' não consumidos (automatico)
 
   const enriched = consumos.map(c => {
     const fn = funcionarios.find(f => f.id === c.funcionario_id)
@@ -35,7 +27,8 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
   const filtered = enriched.filter(c =>
     (!fStart || c.data >= fStart) &&
     (!fEnd   || c.data <= fEnd)   &&
-    (!fMeal  || c.tipo === fMeal)
+    (!fMeal  || c.tipo === fMeal) &&
+    (!fEstado || (fEstado === 'N') === !!c.automatico)
   )
 
   const enrichedVisitantes = visitantes.map(v => {
@@ -48,11 +41,12 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
   const filteredVisitantes = enrichedVisitantes.filter(v =>
     (!fStart || v.data >= fStart) &&
     (!fEnd   || v.data <= fEnd)   &&
-    (!fMeal  || v.tipo === fMeal)
+    (!fMeal  || v.tipo === fMeal) &&
+    fEstado !== 'N'   // visitantes contam sempre como consumidos
   )
 
   const sorted = [
-    ...filtered.map(c => ({key:`c-${c.id}`, ts:c.validado_em, data:c.data, tipo:c.tipo, pratoNum:c.prato_num, pratoLabel:c.pratoLabel, quantidade:1, nome:c.nome, foto:c.foto, numero:c.numero})),
+    ...filtered.map(c => ({key:`c-${c.id}`, ts:c.validado_em, data:c.data, tipo:c.tipo, pratoNum:c.prato_num, pratoLabel:c.pratoLabel, quantidade:1, nome:c.nome, foto:c.foto, numero:c.numero, automatico:c.automatico})),
     ...filteredVisitantes.map(v => ({key:`v-${v.id}`, ts:v.registado_em, data:v.data, tipo:v.tipo, pratoNum:v.prato_num, pratoLabel:v.pratoLabel, quantidade:v.quantidade})),
   ].sort((a, b) => new Date(b.ts) - new Date(a.ts))
 
@@ -65,6 +59,25 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     j: funcQtd('J') + visQtd('J'),
     funcionarios: funcQtd(),
     visitantes: visQtd(),
+    naoConsumidos: filtered.filter(c => c.automatico).length,
+  }
+
+  const exportar = async formato => {
+    const rows = exportRows(sorted), summary = exportSummary({fStart,fEnd,fMeal,fEstado,stats})
+    if (formato === 'pdf') {
+      const win = window.open('', '_blank')
+      if (!win) return
+      win.document.write(printHtml(rows, summary)); win.document.close()
+      win.onafterprint = () => win.close()
+      win.focus(); win.print()
+      return
+    }
+    const XLSX = await import('xlsx')   // ponytail: carregado só ao exportar (~400 KB)
+    const ws = XLSX.utils.aoa_to_sheet([...summary.map(s => [s]), [], HEADERS, ...rows])
+    ws['!cols'] = [6, 30, 12, 10, 18, 6, 8, 15].map(wch => ({wch}))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Consumos')
+    XLSX.writeFile(wb, `consumos_${fStart||'inicio'}_${fEnd||'fim'}.xlsx`)
   }
 
   const pill = {height:34,padding:'0 14px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:99,color:C.text,fontSize:12,outline:'none',cursor:'pointer'}
@@ -73,20 +86,10 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minHeight:0}}>
 
       {/* ── Toolbar ── */}
-      <div style={{padding:'14px 32px',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:24,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+      <div style={{padding:'14px 32px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:24,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
 
         {/* Stats */}
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          <div style={{display:'flex',gap:8}}>
-            <StatCard label="Total" value={stats.total}/>
-            <StatCard label="🌞 Almoços" value={stats.a}/>
-            <StatCard label="🌙 Jantares" value={stats.j}/>
-          </div>
-          <div style={{display:'flex',gap:8}}>
-            <StatCard label="Funcionários" value={stats.funcionarios}/>
-            <StatCard label="Visitantes" value={stats.visitantes}/>
-          </div>
-        </div>
+        <KpiLine items={[{value:stats.total,label:'consumos'},{value:stats.a,label:'almoços'},{value:stats.j,label:'jantares'},{value:stats.funcionarios,label:'funcionários'},{value:stats.visitantes,label:'visitantes'},{value:stats.naoConsumidos,label:'não consumidos'}]}/>
 
         {/* Filters */}
         <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -98,14 +101,25 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
             <option value="A">Almoço</option>
             <option value="J">Jantar</option>
           </select>
+          <select value={fEstado} onChange={e => setFEstado(e.target.value)} style={{...pill,width:150}}>
+            <option value="">Todos os estados</option>
+            <option value="C">Consumidos</option>
+            <option value="N">Não consumidos</option>
+          </select>
           <button onClick={() => {setFStart(TODAY);setFEnd(TODAY)}}
             style={{...pill,color:C.yellow,border:`1px solid ${C.yellow}44`,background:'transparent',fontWeight:700}}>
             Hoje
           </button>
-          <button onClick={() => {setFStart(FIRST_MONTH());setFEnd(TODAY);setFMeal('')}}
+          <button onClick={() => {setFStart(FIRST_MONTH());setFEnd(LAST_MONTH());setFMeal('');setFEstado('')}}
             style={{...pill,padding:'0 12px',color:C.textMuted,background:'transparent',border:`1px solid ${C.border}`}}>
             Limpar
           </button>
+          {['pdf','xlsx'].map(f => (
+            <button key={f} onClick={() => exportar(f)} disabled={!sorted.length}
+              style={{...pill,padding:'0 12px',color:C.textSub,background:'transparent',display:'inline-flex',alignItems:'center',gap:6,opacity:sorted.length?1:0.4,cursor:sorted.length?'pointer':'default'}}>
+              <Icon name="download" size={13} color={C.textSub}/>{f === 'pdf' ? 'PDF' : 'Excel'}
+            </button>
+          ))}
         </div>
 
       </div>
@@ -135,7 +149,11 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
                   ? <div style={{display:'flex',alignItems:'center',gap:10}}>
                       <Avatar nome={c.nome} foto={c.foto} size={30}/>
                       <div>
-                        <div style={{fontSize:13,fontWeight:600,color:C.text}}>{c.nome}</div>
+                        <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:8}}>
+                          {c.nome}
+                          {c.automatico && <span title="Marcou mas não validou; registado no fecho da refeição"
+                            style={{fontSize:10,fontWeight:700,letterSpacing:'0.04em',padding:'2px 7px',borderRadius:99,color:C.warn,background:`${C.warn}1a`,border:`1px solid ${C.warn}44`}}>NÃO CONSUMIDO</span>}
+                        </div>
                         <div style={{fontSize:11,color:C.textMuted}}>Nº {c.numero}</div>
                       </div>
                     </div>

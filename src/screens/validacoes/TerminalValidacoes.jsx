@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
-import { insertVisitantes, fetchConsumosPorData, fetchVisitantesPorData, fetchMarcacoesPorPeriodo, deleteConsumo, deleteVisitante, fetchMarcacoesSemConsumo, insertConsumoBatch, deleteMarcacao } from '../../lib/queries'
+import { insertVisitantes, fetchConsumosPorData, fetchVisitantesPorData, fetchMarcacoesPorPeriodo, deleteConsumo, deleteVisitante, deleteMarcacao } from '../../lib/queries'
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
 import { getMeal, getNextMeal, toMin } from '../../utils/meal'
@@ -79,28 +79,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
 
   const meal = getMeal(s)   // null quando fora do horário
 
-  // Fecho automático do serviço: na transição 'A'/'J' → null, marca como consumidas
-  // todas as marcações da refeição que acabou de fechar que ainda não têm consumo
-  const prevMealRef = useRef(meal)
-  useEffect(() => {
-    if(prevMealRef.current && !meal) fecharServicoAutomaticamente(prevMealRef.current)
-    prevMealRef.current = meal
-  }, [meal])
-
-  const fecharServicoAutomaticamente = async tipoFechado => {
-    const ementaFechada = ementas.find(e=>e.data===TODAY&&e.tipo===tipoFechado)
-    if(!ementaFechada) return
-    const [marcs,{data:cons}] = await Promise.all([
-      fetchMarcacoesSemConsumo(ementaFechada.id),
-      supabase.from('cantina_consumos').select('funcionario_id').eq('ementa_id',ementaFechada.id),
-    ])
-    const jaConsumidos = new Set((cons||[]).map(c=>c.funcionario_id))
-    const pendentes = marcs.filter(m=>!jaConsumidos.has(m.funcionario_id))
-    if(pendentes.length===0) return
-    const agora = new Date().toISOString()
-    await insertConsumoBatch(pendentes.map(m=>({funcionario_id:m.funcionario_id,ementa_id:ementaFechada.id,prato_num:m.prato_num,validado_em:agora})))
-    loadContadores(ementaAtual)
-  }
+  // Fecho automático (marcação sem consumo → consumo "não consumido") corre no servidor: sql/fecho_automatico.sql
 
   // Ref para process() — evita stale closure no useSerial
   const processRef = useRef(null)
@@ -166,7 +145,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
 
   const confirmarConsumo = async (func,ementa,pratoNum) => {
     const {data,error} = await supabase.from('cantina_consumos').insert({funcionario_id:func.id,ementa_id:ementa.id,prato_num:pratoNum}).select().single()
-    if(error) return
+    if(error){console.error('confirmarConsumo:',error);setStatus({type:'error',msg:`Erro ao registar: ${error.message}`});setTimeout(reset,6000);return}
     const pk=`prato${pratoNum}`,pratoLabel=ementa[pk+'_label'],pratoDesc=ementa[pk+'_desc']
     setRecentes(p=>[{id:data.id,validado_em:data.validado_em,nome:func.nome,foto:func.foto,pratoNum,pratoLabel,pratoDesc},...p].slice(0,parseInt(s.validacao_sidebar_num)||10))
     loadContadores(ementa)

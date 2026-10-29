@@ -15,6 +15,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* O alvo do clique é sempre o botão inteiro, nunca o ícone lá dentro */
+button > * { pointer-events: none; }
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

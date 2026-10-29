@@ -1,16 +1,15 @@
 import { useState } from 'react'
 import { C } from '../../constants/colors'
-import { FIRST_MONTH, TODAY, fmtS } from '../../utils/date'
+import { FIRST_MONTH, LAST_MONTH, TODAY, fmtS } from '../../utils/date'
 import Avatar from '../../components/Avatar'
 import PratoTag from '../../components/PratoTag'
+import KpiLine from '../../components/KpiLine'
 
-const EYE  = {fontSize:11,fontWeight:700,color:'#64748b',letterSpacing:'0.14em',textTransform:'uppercase',marginBottom:2}
-const BIG  = {fontStyle:'italic',fontSize:26,color:'#e2e8f0',lineHeight:1}
 const TH   = {fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.1em'}
 
 export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
   const [fStart, setFStart] = useState(FIRST_MONTH())
-  const [fEnd,   setFEnd]   = useState(TODAY)
+  const [fEnd,   setFEnd]   = useState(LAST_MONTH())
   const [fMeal,  setFMeal]  = useState('')
   const [view,   setView]   = useState('funcionario')
 
@@ -40,22 +39,7 @@ export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
       <div style={{padding:'14px 32px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
 
         {/* Stats */}
-        <div style={{display:'flex',alignItems:'center',gap:24}}>
-          <div>
-            <div style={EYE}>Marcações</div>
-            <div style={BIG}>{stats.total}</div>
-          </div>
-          <div style={{width:1,height:28,background:C.border}}/>
-          <div style={{display:'flex',alignItems:'center',gap:12,fontSize:12,color:C.textSub}}>
-            <span style={{display:'inline-flex',alignItems:'center',gap:5}}>
-              🌞 <strong style={{color:C.text}}>{stats.a}</strong> almoços
-            </span>
-            <div style={{width:1,height:14,background:C.border}}/>
-            <span style={{display:'inline-flex',alignItems:'center',gap:5}}>
-              🌙 <strong style={{color:C.text}}>{stats.j}</strong> jantares
-            </span>
-          </div>
-        </div>
+        <KpiLine items={[{value:stats.total,label:'marcações'},{value:stats.a,label:'almoços'},{value:stats.j,label:'jantares'}]}/>
 
         {/* Filters + view toggle */}
         <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -71,7 +55,7 @@ export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
             style={{...pill,color:C.yellow,border:`1px solid ${C.yellow}44`,background:'transparent',fontWeight:700}}>
             Hoje
           </button>
-          <button onClick={() => {setFStart(FIRST_MONTH());setFEnd(TODAY);setFMeal('')}}
+          <button onClick={() => {setFStart(FIRST_MONTH());setFEnd(LAST_MONTH());setFMeal('')}}
             style={{...pill,padding:'0 12px',color:C.textMuted,background:'transparent',border:`1px solid ${C.border}`}}>
             Limpar
           </button>
