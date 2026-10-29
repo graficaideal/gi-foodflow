@@ -2,19 +2,26 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { exportRows, exportSummary, printHtml, HEADERS } from './consumosExport.js'
 
-const func = {nome:'Ana <Silva>', numero:'169', data:'2026-10-29', tipo:'A', pratoNum:1, pratoLabel:'Carne', quantidade:1, ts:'2026-10-29T12:30:00'}
-const vis  = {data:'2026-10-28', tipo:'J', pratoNum:3, pratoLabel:null, quantidade:4, ts:'2026-10-28T19:05:00'}
+const c = (numero, nome, tipo, extra = {}) => ({numero, nome, tipo, quantidade:1, ...extra})
+const vis = (tipo, quantidade) => ({tipo, quantidade})
 
-test('exportRows: funcionário e visitante, mesma ordem da tabela', () => {
-  const [a, b] = exportRows([func, vis])
-  assert.deepEqual(a.slice(0, 6), ['169', 'Ana <Silva>', '29/10/2026', 'Almoço', 'Carne', 1])
-  assert.deepEqual(b.slice(0, 6), ['', 'Visitante(s)', '28/10/2026', 'Jantar', 'Prato 3', 4])
-  assert.equal(a.length, HEADERS.length)
+test('exportRows: agrupa por funcionário, ordena por Nº numérico, visitantes e TOTAL no fim', () => {
+  const rows = exportRows([
+    c('169', 'Bruno', 'A'), c('12', 'Ana', 'J'), c('169', 'Bruno', 'J', {automatico:true}),
+    c('12', 'Ana', 'A'), c('12', 'Ana', 'A'), vis('J', 4), vis('A', 2),
+  ])
+  assert.deepEqual(rows, [
+    ['12',  'Ana',        2, 1, 3, 0],
+    ['169', 'Bruno',      1, 1, 2, 1],
+    ['',    'Visitantes', 2, 4, 6, 0],
+    ['',    'TOTAL',      5, 6, 11, 1],
+  ])
+  assert.equal(rows[0].length, HEADERS.length)
 })
 
-test('exportRows: coluna Estado distingue consumo automático (não consumido)', () => {
-  const [a, b, c] = exportRows([func, {...func, automatico:true}, vis])
-  assert.deepEqual([a.at(-1), b.at(-1), c.at(-1)], ['Consumido', 'Não consumido', 'Consumido'])
+test('exportRows: sem visitantes não cria a linha; vazio dá só TOTAL a zeros', () => {
+  assert.deepEqual(exportRows([c('5', 'Rui', 'A')]).map(r => r[1]), ['Rui', 'TOTAL'])
+  assert.deepEqual(exportRows([]), [['', 'TOTAL', 0, 0, 0, 0]])
 })
 
 test('exportSummary: período, refeição, estado e totais; datas vazias não rebentam', () => {
@@ -25,8 +32,8 @@ test('exportSummary: período, refeição, estado e totais; datas vazias não re
   assert.match(exportSummary({fStart:'', fEnd:'', fMeal:'', fEstado:'', stats})[0], /…/)
 })
 
-test('printHtml: escapa HTML dos nomes e inclui todas as linhas', () => {
-  const html = printHtml(exportRows([func, vis]), ['x'])
+test('printHtml: escapa HTML dos nomes e destaca a linha TOTAL', () => {
+  const html = printHtml(exportRows([c('1', 'Ana <Silva>', 'A')]), ['x'])
   assert.ok(html.includes('Ana &lt;Silva&gt;') && !html.includes('<Silva>'))
-  assert.equal((html.match(/<tr>/g) || []).length, 3) // cabeçalho + 2
+  assert.equal((html.match(/<tr class="total">/g) || []).length, 1)
 })

@@ -1,23 +1,31 @@
-import { fmtHM } from './date.js'
-
-export const HEADERS = ['Nº', 'Nome', 'Data', 'Refeição', 'Prato', 'Qtd', 'Hora', 'Estado']
+export const HEADERS = ['Nº', 'Nome', 'Almoços', 'Jantares', 'Total', 'Não consumidos']
+const NUM = 2   // colunas a partir desta são numéricas
 
 const dmy = s => s.split('-').reverse().join('/')
 const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-// Linhas tal como aparecem na tabela de Consumos (já filtradas e ordenadas)
-export const exportRows = sorted => sorted.map(c => [
-  c.nome ? c.numero : '',
-  c.nome || 'Visitante(s)',
-  dmy(c.data),
-  c.tipo === 'A' ? 'Almoço' : 'Jantar',
-  c.pratoLabel || `Prato ${c.pratoNum}`,
-  c.quantidade,
-  fmtHM(c.ts),
-  c.automatico ? 'Não consumido' : 'Consumido',
-])
+// Agrupa as linhas visíveis (já filtradas) por funcionário: almoços, jantares, total, não consumidos.
+// Visitantes numa linha própria e TOTAL no fim (sempre a última linha).
+export const exportRows = sorted => {
+  const by = new Map(), vis = {a:0, j:0}
+  for (const c of sorted) {
+    const k = c.tipo === 'A' ? 'a' : 'j'
+    if (!c.nome) { vis[k] += c.quantidade; continue }
+    const g = by.get(c.numero) || {numero:c.numero, nome:c.nome, a:0, j:0, nc:0}
+    g[k] += c.quantidade
+    if (c.automatico) g.nc++
+    by.set(c.numero, g)
+  }
+  const rows = [...by.values()]
+    .sort((x, y) => String(x.numero).localeCompare(String(y.numero), undefined, {numeric:true}))
+    .map(g => [g.numero, g.nome, g.a, g.j, g.a + g.j, g.nc])
+  if (vis.a + vis.j) rows.push(['', 'Visitantes', vis.a, vis.j, vis.a + vis.j, 0])
+  const sum = i => rows.reduce((s, r) => s + r[i], 0)
+  rows.push(['', 'TOTAL', sum(2), sum(3), sum(4), sum(5)])
+  return rows
+}
 
-// Linha de contexto: período, refeição e totais
+// Linhas de contexto: período, filtros e totais
 export const exportSummary = ({fStart, fEnd, fMeal, fEstado, stats}) => [
   `Período: ${fStart ? dmy(fStart) : '…'} a ${fEnd ? dmy(fEnd) : '…'}`,
   `Refeição: ${fMeal === 'A' ? 'Almoço' : fMeal === 'J' ? 'Jantar' : 'Todas'} · Estado: ${fEstado === 'C' ? 'Consumidos' : fEstado === 'N' ? 'Não consumidos' : 'Todos'}`,
@@ -32,13 +40,14 @@ export const printHtml = (rows, summary) => `<!DOCTYPE html><html><head><meta ch
   table { width: 100%; border-collapse: collapse; margin-top: 12px; }
   th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1.5px solid #000; padding: 4px 6px; }
   td { padding: 4px 6px; border-bottom: 1px solid #ddd; }
-  td.n { text-align: right; } th.n { text-align: right; }
+  .n { text-align: right; }
   tr { break-inside: avoid; }
+  tr.total td { font-weight: 700; border-top: 1.5px solid #000; border-bottom: none; }
 </style></head><body>
-  <h1>FoodFlow · Consumos</h1>
+  <h1>FoodFlow · Consumos por funcionário</h1>
   ${summary.map(s => `<div class="meta">${esc(s)}</div>`).join('')}
   <table>
-    <thead><tr>${HEADERS.map((h, i) => `<th${i === 5 ? ' class="n"' : ''}>${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(r => `<tr>${r.map((v, i) => `<td${i === 5 ? ' class="n"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>
+    <thead><tr>${HEADERS.map((h, i) => `<th${i >= NUM ? ' class="n"' : ''}>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r, ri) => `<tr${ri === rows.length - 1 ? ' class="total"' : ''}>${r.map((v, i) => `<td${i >= NUM ? ' class="n"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>
   </table>
 </body></html>`
