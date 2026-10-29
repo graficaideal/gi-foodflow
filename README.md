@@ -1,4 +1,4 @@
-# GI — Gestão de Cantina
+# GI — Gestão de Cantina 
 
 App de gestão de cantina da Gráfica Ideal.
 
