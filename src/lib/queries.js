@@ -13,7 +13,7 @@ export const fetchDefinicoes    = async () => {
   const s={...DEFAULTS}; for(const r of data||[]) s[r.chave]=r.valor; return s
 }
 export const saveDefinicao = async (chave,valor) =>
-  supabase.from('cantina_definicoes').upsert({chave,valor,updated_at:new Date().toISOString()})
+  supabase.from('cantina_definicoes').upsert({chave,valor,updated_at:new Date().toISOString()},{onConflict:'chave'})
 
 export const fetchDiasFechados = async () => {
   const {data} = await supabase.from('cantina_dias_fechados').select('data')
