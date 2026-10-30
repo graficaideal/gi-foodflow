@@ -10,10 +10,6 @@ import TerminalValidacoes from './screens/validacoes/TerminalValidacoes'
 import Backoffice from './screens/backoffice/Backoffice'
 import BackofficePin from './screens/backoffice/BackofficePin'
 
-// Autenticação do backoffice dura a sessão do separador (sessionStorage)
-const BO_KEY = 'ff_backoffice_ok'
-const boAuthed = () => { try { return sessionStorage.getItem(BO_KEY) === '1' } catch(_) { return false } }
-
 const getInitialMode = () => {
   try { const p=new URLSearchParams(window.location.search),m=p.get('mode'); if(['marcacoes','validacoes','backoffice'].includes(m)) return m } catch(_){}
   return 'selector'
@@ -29,7 +25,7 @@ export default function App() {
   const [consumos,     setConsumos]     = useState([])
   const [visitantes,   setVisitantes]   = useState([])
   const [settings,     setSettings]     = useState(DEFAULTS)
-  const [boOk,         setBoOk]         = useState(boAuthed)
+  const [boOk,         setBoOk]         = useState(false)   // PIN pedido sempre que se entra no backoffice
 
   const reload = useCallback(async () => {
     try {
@@ -65,6 +61,6 @@ export default function App() {
   if (mode==='marcacoes')  return <><ErrBar/><TerminalMarcacoes  {...shared} reload={reload} onBack={()=>setMode('selector')}/></>
   if (mode==='validacoes') return <><ErrBar/><TerminalValidacoes {...shared} onBack={()=>setMode('selector')}/></>
   if (mode==='backoffice' && !boOk) return <BackofficePin pin={settings.backoffice_pin} onBack={()=>setMode('selector')}
-    onOk={()=>{ try { sessionStorage.setItem(BO_KEY,'1') } catch(_) {} ; setBoOk(true) }}/>
-  if (mode==='backoffice') return <><ErrBar/><Backoffice {...shared} marcacoesAll={marcacoesAll} consumos={consumos} visitantes={visitantes} reload={reload} onBack={()=>setMode('selector')}/></>
+    onOk={()=>setBoOk(true)}/>
+  if (mode==='backoffice') return <><ErrBar/><Backoffice {...shared} marcacoesAll={marcacoesAll} consumos={consumos} visitantes={visitantes} reload={reload} onBack={()=>{ setBoOk(false); setMode('selector') }}/></>
 }
