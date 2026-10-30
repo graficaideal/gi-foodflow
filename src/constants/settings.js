@@ -6,4 +6,5 @@ export const DEFAULTS = {
   validacao_tempo_ok:  '5',
   validacao_tempo_dup: '6',
   validacao_sidebar_num: '10',
+  backoffice_pin: '123456',   // ponytail: sobreposto por cantina_definicoes se a chave existir
 }
