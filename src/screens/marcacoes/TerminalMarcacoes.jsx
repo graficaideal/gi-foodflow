@@ -4,6 +4,8 @@ import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
 import { WD, WD_FULL, MN, TODAY, addD } from '../../utils/date'
 import { fmtHorario } from '../../utils/meal'
+import { diasMarcaveis } from '../../utils/marcar'
+import { fetchDiasFechados } from '../../lib/queries'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
 import Logo from '../../components/Logo'
@@ -167,7 +169,7 @@ function MinhasMarcacoes({items, total, narrow, s, isLocked, confirmId, setConfi
   )
 }
 
-export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}) {
+export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,settings,reload,onBack}) {
   const s = {...DEFAULTS,...settings}
   const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'
   const [step,      setStep]      = useState('numero')
@@ -183,8 +185,12 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
   const [toast,     setToast]     = useState(null)   // { msg, error }
   const [listOpen,  setListOpen]  = useState(false)
   const [confirmId, setConfirmId] = useState(null)   // ementa_id em confirmação de eliminação
+  const [fechados,  setFechados]  = useState([])     // datas em cantina_dias_fechados
+  const [refreshing,setRefreshing]= useState(false)
   const toastTimer = useRef(null)
   const narrow = useNarrow()
+  // Dias encerrados não existem para o terminal: sem ementa, sem marcação.
+  const ementas = todasEmentas.filter(e => !fechados.includes(e.data))
 
   // RFID via ref — usado pelo useSerial para evitar stale closure
   const onUidRef = useRef(uid => {
@@ -219,8 +225,10 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
 
   const loadMarcacoes = async fid => { const{data}=await supabase.from('cantina_marcacoes').select('*').eq('funcionario_id',fid); setMarcacoes(data||[]) }
 
+  const loadFechados = () => fetchDiasFechados().then(setFechados)
+
   const loginFunc = (f, viaRfid = false) => {
-    loadMarcacoes(f.id)
+    loadMarcacoes(f.id); loadFechados()
     if(f.pin && !viaRfid){setFunc(f);setStep('pin');setNumInput('');setErr('')}
     else{setFunc(f);setStep('dashboard');setNumInput('');setErr('')}
   }
@@ -284,12 +292,12 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
 
   const bloqueado = s.bloquear_dia_proprio==='true'
 
-  // Semana de trabalho fixa (seg–sex). Se selDay não pertence à semana visível, seleciona o 1.º dia não passado.
-  const daysOf   = off => Array.from({length:5}, (_,i) => addD(WEEK0, off*7+i))
+  // Semana de trabalho (seg–sex) sem os dias encerrados. Se selDay não pertence à semana visível, seleciona o 1.º dia não passado.
+  const daysOf   = off => diasMarcaveis(TODAY, off, fechados)
   const weekDays = daysOf(weekOffset)
-  const day      = weekDays.includes(selDay) ? selDay : (weekDays.find(d=>d>=TODAY) || weekDays[0])
+  const day      = weekDays.includes(selDay) ? selDay : (weekDays.find(d=>d>=TODAY) || weekDays[0])   // undefined se a semana está toda encerrada
   const hasPrev  = weekOffset > 0
-  const hasNext  = ementas.some(e=>e.data>weekDays[4])
+  const hasNext  = ementas.some(e=>e.data>addD(WEEK0, weekOffset*7+4))
   // Mudar de dia ou de semana limpa SEMPRE a refeição: obriga a confirmar a refeição em cada dia.
   const selectDay = d => { setSelDay(d); setSelMeal(null) }
   const goWeek   = off => { const w=daysOf(off); setWeekOffset(off); selectDay(w.find(d=>d>=TODAY) || w[0]) }
@@ -304,7 +312,12 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
     setToast({msg,error}); clearTimeout(toastTimer.current)
     toastTimer.current = setTimeout(()=>setToast(null), 2600)
   }
-  const dia = fmtDia(day)
+  const dia = day ? fmtDia(day) : ''
+  const refresh = async () => {
+    setRefreshing(true)
+    await Promise.all([reload(), loadMarcacoes(func.id), loadFechados()]).catch(()=>{})
+    setRefreshing(false)
+  }
   const doMarcar   = async (em,n,label,pratoLabel) => { if (await marcar(em,n)) flash('Erro ao guardar',true); else flash(`${label} de ${dia} · ${pratoLabel}`) }
   const doCancelar = async (em,label,verbo='desmarcado') => { if (await cancelar(em.id)) flash('Erro ao guardar',true); else flash(`${label} de ${fmtDia(em.data)} ${verbo}`) }
 
@@ -341,6 +354,9 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
           </div>
         </div>
         <div style={{display:'flex',gap:10,flexShrink:0}}>
+          <button onClick={refresh} disabled={refreshing} aria-label="Atualizar" style={{width:60,height:60,flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',cursor:refreshing?'default':'pointer'}}>
+            <span style={{display:'flex',animation:refreshing?'spin 0.8s linear infinite':undefined}}><Icon name="refresh" size={24}/></span>
+          </button>
           <button onClick={()=>{setListOpen(true);setConfirmId(null)}} style={{height:60,padding:'0 22px',background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,fontSize:18,fontWeight:700,display:'inline-flex',alignItems:'center',gap:12,cursor:'pointer',fontFamily:'inherit'}}>
             <Icon name="list" size={22}/>{narrow?'Marcações':'As minhas marcações'}
             <span style={{minWidth:32,height:32,padding:'0 9px',borderRadius:99,background:C.yellow,color:C.bg,fontSize:16,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{nFuturas}</span>
@@ -378,7 +394,7 @@ export default function TerminalMarcacoes({funcionarios,ementas,settings,onBack}
         </div>
 
         {dayEm.length===0 ? (
-          <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.textSub,fontSize:20}}>Sem ementa para este dia.</div>
+          <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.textSub,fontSize:20}}>{day ? 'Sem ementa para este dia.' : 'Cantina encerrada esta semana.'}</div>
         ) : (
           <div style={{flex:1,minHeight:0,display:'grid',gridTemplateColumns:`${narrow?250:300}px minmax(0,1fr)`}}>
             <div style={{padding:16,display:'flex',flexDirection:'column',gap:12,borderRight:`1px solid ${C.border}`,background:C.bg}}>
