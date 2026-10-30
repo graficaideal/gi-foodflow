@@ -54,6 +54,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
   const [marcDe,       setMarcDe]     = useState(TODAY)
   const [marcAte,      setMarcAte]    = useState(TODAY)
   const [marcRefeicao, setMarcRefeicao] = useState('ambos') // 'A' | 'J' | 'ambos'
+  const [marcDetalhada,setMarcDetalhada]= useState(true)    // false → só cabeçalho + totais
   const [marcsAtuais, setMarcsAtuais] = useState([])
   const [consAtuais,  setConsAtuais]  = useState([])
   const [faltamModal, setFaltamModal] = useState(null) // {n,label}
@@ -237,8 +238,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
       <div>Impresso: ${agoraStr}</div>
       <div>${periodoLabel} · ${refeicaoLabel}</div>
       <div class="sep"></div>
-      ${rowsHtml}
-      <div class="sep"></div>
+      ${marcDetalhada ? `${rowsHtml}<div class="sep"></div>` : ''}
       ${totaisHtml}
       <div class="sep"></div>
       <table class="totais"><tr><td><strong>TOTAL GERAL</strong></td><td class="num"><strong>${enriched.length}</strong></td></tr></table>
@@ -798,6 +798,18 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
                 ))}
               </div>
             </div>
+
+            <button role="switch" aria-checked={marcDetalhada} onClick={()=>setMarcDetalhada(v=>!v)}
+              style={{minHeight:56,borderRadius:12,cursor:'pointer',padding:'0 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,
+                background:C.surface2,border:`1px solid ${marcDetalhada?C.yellow:C.border}`,color:C.text,textAlign:'left'}}>
+              <span>
+                <span style={{display:'block',fontSize:14,fontWeight:700}}>Detalhada</span>
+                <span style={{display:'block',fontSize:12,color:C.textMuted,marginTop:2}}>{marcDetalhada ? 'Lista de funcionários + totais' : 'Só totais por prato'}</span>
+              </span>
+              <span style={{width:48,height:28,borderRadius:99,padding:3,flexShrink:0,background:marcDetalhada?C.yellow:C.border,display:'flex',justifyContent:marcDetalhada?'flex-end':'flex-start',transition:'all 0.15s'}}>
+                <span style={{width:22,height:22,borderRadius:'50%',background:marcDetalhada?C.bg:C.textSub}}/>
+              </span>
+            </button>
 
             <div style={{display:'flex',gap:12,marginTop:6}}>
               <button onClick={()=>setShowMarc(false)}
