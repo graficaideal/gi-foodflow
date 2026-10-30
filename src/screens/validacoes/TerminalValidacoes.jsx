@@ -4,7 +4,7 @@ import { insertVisitantes, fetchConsumosPorData, fetchVisitantesPorData, fetchMa
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
 import { getMeal, getNextMeal, toMin } from '../../utils/meal'
-import { fmtHM, fmtS, TODAY, WD, MN, addD } from '../../utils/date'
+import { fmtHM, fmtS, TODAY, WD, MN, addD, proximoDiaUtil } from '../../utils/date'
 import { pratoColors } from '../../constants/pratos'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
@@ -14,6 +14,9 @@ import PratoTag from '../../components/PratoTag'
 import PratoBtn from '../../components/PratoBtn'
 import useSerial from '../../hooks/useSerial'
 import { refeicoesPorMarcar } from '../../utils/marcar'
+
+// Botão "Amanhã" da impressão: de sexta a domingo passa a ser a segunda-feira seguinte (ver proximoDiaUtil)
+const PROX_LABEL = [5,6,0].includes(new Date(TODAY+'T12:00:00').getDay()) ? 'Segunda-feira' : 'Amanhã'
 
 // Cores específicas dos takeovers deste ecrã — não são tokens globais
 const V = {
@@ -169,8 +172,8 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
   }
 
   const imprimirMarcacoes = async () => {
-    const dataInicio = marcPeriodo==='hoje' ? TODAY : marcPeriodo==='amanha' ? addD(TODAY,1) : marcDe
-    const dataFim     = marcPeriodo==='hoje' ? TODAY : marcPeriodo==='amanha' ? addD(TODAY,1) : marcAte
+    const dataInicio = marcPeriodo==='hoje' ? TODAY : marcPeriodo==='amanha' ? proximoDiaUtil(TODAY) : marcDe
+    const dataFim     = marcPeriodo==='hoje' ? TODAY : marcPeriodo==='amanha' ? proximoDiaUtil(TODAY) : marcAte
     const rows = await fetchMarcacoesPorPeriodo(dataInicio,dataFim)
     const enriched = rows
       .filter(r => marcRefeicao==='ambos' || r.tipo===marcRefeicao)
@@ -186,7 +189,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
          {label:'JANTAR',  rows:enriched.filter(r=>r.tipo==='J').sort(porNumero)}].filter(g=>g.rows.length>0)
       : [{label:null, rows:[...enriched].sort(porNumero)}]
 
-    const periodoLabel  = marcPeriodo==='hoje' ? 'Hoje' : marcPeriodo==='amanha' ? 'Amanhã' : `${fmtS(dataInicio)} a ${fmtS(dataFim)}`
+    const periodoLabel  = marcPeriodo==='hoje' ? 'Hoje' : marcPeriodo==='amanha' ? PROX_LABEL : `${fmtS(dataInicio)} a ${fmtS(dataFim)}`
     const refeicaoLabel = marcRefeicao==='A' ? 'Almoço' : marcRefeicao==='J' ? 'Jantar' : 'Almoço + Jantar'
     const agora = new Date()
     const agoraStr = `${String(agora.getDate()).padStart(2,'0')}/${String(agora.getMonth()+1).padStart(2,'0')}/${agora.getFullYear()} ${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
@@ -766,7 +769,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
             <div>
               <div style={{fontSize:11,fontWeight:700,color:C.textMuted,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:10}}>Período</div>
               <div style={{display:'flex',gap:8}}>
-                {[['hoje','Hoje'],['amanha','Amanhã'],['entre','Entre datas']].map(([v,label]) => (
+                {[['hoje','Hoje'],['amanha',PROX_LABEL],['entre','Entre datas']].map(([v,label]) => (
                   <button key={v} onClick={()=>setMarcPeriodo(v)}
                     style={{flex:1,minHeight:56,borderRadius:12,cursor:'pointer',fontSize:14,fontWeight:600,
                       background:marcPeriodo===v?C.yellow:C.surface2,color:marcPeriodo===v?C.bg:C.textSub,

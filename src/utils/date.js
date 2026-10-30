@@ -1,5 +1,7 @@
 export const d2s = d => { const x=d instanceof Date?d:new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` }
 export const addD = (s,n) => { const d=new Date(s+'T12:00:00'); d.setDate(d.getDate()+n); return d2s(d) }
+// Próximo dia útil: amanhã de segunda a quinta; segunda-feira seguinte de sexta a domingo
+export const proximoDiaUtil = s => { const wd=new Date(s+'T12:00:00').getDay(); return addD(s, wd===5 ? 3 : wd===6 ? 2 : 1) }
 export const TODAY = d2s(new Date())
 // [início, fim] do mês atual (offset 0), anterior (-1), …
 export const monthRange = (offset=0, d=new Date()) => [d2s(new Date(d.getFullYear(), d.getMonth()+offset, 1)), d2s(new Date(d.getFullYear(), d.getMonth()+offset+1, 0))]
