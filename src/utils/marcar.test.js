@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { refeicoesPorMarcar, diasMarcaveis, marcacoesNaoConsumidas } from './marcar.js'
+import { refeicoesPorMarcar, diasMarcaveis, marcacoesNaoConsumidas, faltamServir } from './marcar.js'
 
 const ems = [
   { id: 1, data: '2026-10-20', tipo: 'J' },
@@ -20,6 +20,31 @@ test('refeicoesPorMarcar: exclui as já marcadas', () => {
 
 test('refeicoesPorMarcar: sem ementas no dia', () => {
   assert.deepEqual(refeicoesPorMarcar(ems, [], '2026-10-22'), [])
+})
+
+const funcs = [{ id: 1, nome: 'Zé' }, { id: 2, nome: 'Ana' }, { id: 3, nome: 'Bruno' }]
+const nomes = r => r.map(f => f.nome)
+
+test('faltamServir: marcados no prato sem consumo, por nome', () => {
+  const m = [{ funcionario_id: 1, prato_num: 1 }, { funcionario_id: 2, prato_num: 1 }, { funcionario_id: 3, prato_num: 2 }]
+  assert.deepEqual(nomes(faltamServir(m, [], funcs, 1)), ['Ana', 'Zé'])
+})
+
+test('faltamServir: consumo de quem não marcou não apaga quem falta', () => {
+  // Bruno consumiu o prato 1 sem marcação: a subtração de totais daria 0, mas o Zé continua por servir
+  const m = [{ funcionario_id: 1, prato_num: 1 }]
+  const c = [{ funcionario_id: 3, prato_num: 1 }]
+  assert.deepEqual(nomes(faltamServir(m, c, funcs, 1)), ['Zé'])
+})
+
+test('faltamServir: consumo de outro prato conta como servido', () => {
+  const m = [{ funcionario_id: 1, prato_num: 1 }]
+  const c = [{ funcionario_id: 1, prato_num: 2 }]
+  assert.deepEqual(faltamServir(m, c, funcs, 1), [])
+})
+
+test('faltamServir: ignora marcações de funcionários desconhecidos', () => {
+  assert.deepEqual(faltamServir([{ funcionario_id: 99, prato_num: 1 }], [], funcs, 1), [])
 })
 
 const marcs = [

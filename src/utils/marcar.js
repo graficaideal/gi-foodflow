@@ -8,6 +8,18 @@ export const refeicoesPorMarcar = (ementas, marcacoes, data) => {
     .sort((a, b) => (a.tipo === 'A' ? -1 : 1) - (b.tipo === 'A' ? -1 : 1))
 }
 
+// Funcionários com o prato `n` marcado que ainda não consumiram nesta refeição, por nome.
+// Fonte única do contador "Faltam servir" e da lista ao clicar. Qualquer consumo conta, seja qual for o prato:
+// quem já consumiu é recusado como duplicado no leitor.
+export const faltamServir = (marcacoes, consumos, funcionarios, n) => {
+  const consumidos = new Set(consumos.map(c => c.funcionario_id))
+  return marcacoes
+    .filter(m => m.prato_num === n && !consumidos.has(m.funcionario_id))
+    .map(m => funcionarios.find(f => f.id === m.funcionario_id))
+    .filter(Boolean)
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+}
+
 // Marcações sem consumo real, mais antigas primeiro. Consumo automatico = fecho da refeição sem validação, logo não conta.
 // Dias encerrados ficam de fora: o fecho automático também os ignora, nada foi debitado.
 export const marcacoesNaoConsumidas = (marcacoes, consumos, fechados, vistos = []) => {

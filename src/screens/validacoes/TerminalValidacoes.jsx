@@ -13,7 +13,7 @@ import LoginShell, { ARR } from '../../components/LoginShell'
 import PratoTag from '../../components/PratoTag'
 import PratoBtn from '../../components/PratoBtn'
 import useSerial from '../../hooks/useSerial'
-import { refeicoesPorMarcar } from '../../utils/marcar'
+import { refeicoesPorMarcar, faltamServir } from '../../utils/marcar'
 
 // Botão "Amanhã" da impressão: de sexta a domingo passa a ser a segunda-feira seguinte (ver proximoDiaUtil)
 const PROX_LABEL = [5,6,0].includes(new Date(TODAY+'T12:00:00').getDay()) ? 'Segunda-feira' : 'Amanhã'
@@ -107,20 +107,9 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
     setContadores([1,2,3,4].map(n => {
       const label = em[`prato${n}_label`]
       if(!label) return null
-      const total  = (marcs||[]).filter(m=>m.prato_num===n).length
-      const served = (cons ||[]).filter(c=>c.prato_num===n).length
-      return {n,label,total,left:Math.max(0,total-served)}
+      const total = (marcs||[]).filter(m=>m.prato_num===n).length
+      return {n,label,total,left:faltamServir(marcs||[],cons||[],funcionarios,n).length}
     }).filter(Boolean))
-  }
-
-  // Colaboradores com este prato marcado que ainda não consumiram — a partir dos dados já em memória
-  const faltamPorPrato = n => {
-    const consumidos = new Set(consAtuais.filter(c=>c.prato_num===n).map(c=>c.funcionario_id))
-    return marcsAtuais
-      .filter(m => m.prato_num===n && !consumidos.has(m.funcionario_id))
-      .map(m => funcionarios.find(f=>f.id===m.funcionario_id))
-      .filter(Boolean)
-      .sort((a,b) => a.nome.localeCompare(b.nome))
   }
 
   const loadRecentes = async () => {
@@ -835,7 +824,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
         </div>
       )}
       {faltamModal && (() => {
-        const lista = faltamPorPrato(faltamModal.n)
+        const lista = faltamServir(marcsAtuais,consAtuais,funcionarios,faltamModal.n)
         return (
           <div onClick={()=>setFaltamModal(null)}
             style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
