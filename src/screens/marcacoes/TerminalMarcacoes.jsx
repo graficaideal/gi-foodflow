@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
-import { WD, WD_FULL, MN, TODAY, addD } from '../../utils/date'
+import { WD, WD_FULL, MN, TODAY, addD, d2s } from '../../utils/date'
 import { fmtHorario } from '../../utils/meal'
-import { diasMarcaveis } from '../../utils/marcar'
-import { fetchDiasFechados } from '../../lib/queries'
+import { diasMarcaveis, marcacoesNaoConsumidas } from '../../utils/marcar'
+import { fetchDiasFechados, fetchMarcacoesEConsumos } from '../../lib/queries'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
 import Logo from '../../components/Logo'
@@ -169,6 +169,35 @@ function MinhasMarcacoes({items, total, narrow, s, isLocked, confirmId, setConfi
   )
 }
 
+// IDs de marcações cujo aviso já foi confirmado. localStorage pode falhar (modo privado): nesse caso o aviso repete.
+// ponytail: guardado por dispositivo e sem limpeza; a lista só cresce. Passa para uma tabela se a confirmação tiver de seguir o funcionário entre terminais.
+const VISTOS_KEY = 'ff-nao-consumidas-vistas'
+const lerVistos = () => { try { return JSON.parse(localStorage.getItem(VISTOS_KEY)) || [] } catch { return [] } }
+const guardarVistos = ids => { try { localStorage.setItem(VISTOS_KEY, JSON.stringify([...lerVistos(), ...ids])) } catch {} }
+
+// Aviso bloqueante: só fecha no botão, para garantir que é lido.
+function AvisoNaoConsumidas({items, onClose}) {
+  return (
+    <div style={{position:'absolute',inset:0,zIndex:30,display:'flex',alignItems:'center',justifyContent:'center',padding:24,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)'}}>
+      <div role="alertdialog" aria-modal="true" aria-labelledby="aviso-nc-titulo" aria-describedby="aviso-nc-texto" style={{width:600,maxWidth:'100%',maxHeight:'100%',background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,boxShadow:'0 24px 64px rgba(0,0,0,0.5)',padding:24,display:'flex',flexDirection:'column',gap:16}}>
+        <div id="aviso-nc-titulo" style={{display:'flex',alignItems:'center',gap:12,fontSize:26,fontWeight:800,lineHeight:1.1}}>
+          <Icon name="warn" size={28} color={C.warn}/>Refeição não consumida
+        </div>
+        <div id="aviso-nc-texto" style={{fontSize:17,lineHeight:1.4,color:C.textSub}}>Tem marcações de dias anteriores que não foram consumidas nem desmarcadas. O custo foi debitado na mesma.</div>
+        <div style={{flex:1,minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column',gap:8}}>
+          {items.map(m => (
+            <div key={m.id} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'12px 16px',background:C.bg,border:`2px solid ${C.border2}`,borderRadius:12,fontSize:17,fontWeight:700,flexShrink:0}}>
+              <span>{fmtDia(m.data)}</span>
+              <span>{MEALS.find(x=>x.tipo===m.tipo).label}</span>
+            </div>
+          ))}
+        </div>
+        <button autoFocus onClick={onClose} style={{height:60,flexShrink:0,borderRadius:14,background:C.yellow,border:'none',color:C.bg,fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Percebi</button>
+      </div>
+    </div>
+  )
+}
+
 export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,settings,reload,onBack}) {
   const s = {...DEFAULTS,...settings}
   const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'
@@ -187,6 +216,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
   const [confirmId, setConfirmId] = useState(null)   // ementa_id em confirmação de eliminação
   const [fechados,  setFechados]  = useState([])     // datas em cantina_dias_fechados
   const [refreshing,setRefreshing]= useState(false)
+  const [naoConsumidas,setNaoConsumidas] = useState([])
   const toastTimer = useRef(null)
   const narrow = useNarrow()
   // Dias encerrados não existem para o terminal: sem ementa, sem marcação.
@@ -226,6 +256,20 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
   const loadMarcacoes = async fid => { const{data}=await supabase.from('cantina_marcacoes').select('*').eq('funcionario_id',fid); setMarcacoes(data||[]) }
 
   const loadFechados = () => fetchDiasFechados().then(setFechados)
+
+  // Só depois do PIN. `ativo` evita mostrar a um funcionário o resultado pendente do anterior.
+  const funcId = step==='dashboard' ? func?.id : null
+  useEffect(() => {
+    setNaoConsumidas([])
+    if (!funcId) return
+    let ativo = true
+    const hoje = d2s(new Date())   // não TODAY: o quiosque fica aberto vários dias
+    Promise.all([fetchMarcacoesEConsumos(funcId, addD(hoje,-30), hoje), fetchDiasFechados()])
+      .then(([{marcacoes,consumos},dias]) => { if (ativo) setNaoConsumidas(marcacoesNaoConsumidas(marcacoes,consumos,dias,lerVistos())) })
+      .catch(() => {})   // aviso informativo: sem dados fiáveis, não mostra
+    return () => { ativo = false }
+  }, [funcId])
+  const fecharAviso = () => { guardarVistos(naoConsumidas.map(m=>m.id)); setNaoConsumidas([]) }
 
   const loginFunc = (f, viaRfid = false) => {
     loadMarcacoes(f.id); loadFechados()
@@ -430,6 +474,8 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
 
       {listOpen && <MinhasMarcacoes items={minhas} total={nFuturas} narrow={narrow} s={s} isLocked={isLocked}
         confirmId={confirmId} setConfirmId={setConfirmId} onRemove={removeFromList} onOpen={openFromList} onClose={closeList}/>}
+
+      {naoConsumidas.length>0 && <AvisoNaoConsumidas items={naoConsumidas} onClose={fecharAviso}/>}
 
       {toast && (
         <div role="status" style={{position:'absolute',left:'50%',bottom:34,transform:'translateX(-50%)',background:C.text,color:toast.error?C.danger:C.bg,borderRadius:14,padding:'16px 26px',fontSize:18,fontWeight:700,display:'flex',alignItems:'center',gap:12,boxShadow:'0 16px 40px rgba(0,0,0,0.45)',whiteSpace:'nowrap',zIndex:20}}>

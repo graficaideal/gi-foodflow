@@ -59,6 +59,25 @@ export const fetchVisitantesPorData = async (data, limit) => {
   return rows || []
 }
 
+// Marcações de um funcionário em [dataInicio, dataFim) e respetivos consumos.
+// Lança em erro: consumos em falta fariam parecer não consumidas refeições que o foram.
+export const fetchMarcacoesEConsumos = async (funcionarioId, dataInicio, dataFim) => {
+  const { data:rows, error } = await supabase.from('cantina_marcacoes')
+    .select('id,ementa_id,cantina_ementas!inner(data,tipo)')
+    .eq('funcionario_id', funcionarioId)
+    .gte('cantina_ementas.data', dataInicio)
+    .lt('cantina_ementas.data', dataFim)
+  if (error) throw error
+  const marcacoes = rows.map(r => ({id:r.id, ementa_id:r.ementa_id, data:r.cantina_ementas.data, tipo:r.cantina_ementas.tipo}))
+  if (!marcacoes.length) return { marcacoes, consumos:[] }
+  const { data:consumos, error:errC } = await supabase.from('cantina_consumos')
+    .select('ementa_id,automatico')
+    .eq('funcionario_id', funcionarioId)
+    .in('ementa_id', marcacoes.map(m => m.ementa_id))
+  if (errC) throw errC
+  return { marcacoes, consumos }
+}
+
 export const fetchMarcacoesPorPeriodo = async (dataInicio, dataFim) => {
   const { data:rows } = await supabase.from('cantina_marcacoes')
     .select('funcionario_id,ementa_id,prato_num,cantina_ementas!inner(data,tipo)')
