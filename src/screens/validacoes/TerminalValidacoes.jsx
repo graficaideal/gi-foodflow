@@ -730,7 +730,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
                       {fmtHM(r.validado_em)} · {r.pratoDesc}
                     </div>
                   </div>
-                  <span style={{flexShrink:0}}><PratoTag slot={r.pratoNum} label={r.pratoLabel?.slice(0,3)}/></span>
+                  <span style={{flexShrink:0}}><PratoTag slot={r.pratoNum} label={r.pratoLabel}/></span>
                   <button onClick={()=>setAnularAlvo(r)} aria-label="Anular validação"
                     style={{width:44,height:44,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',borderRadius:8,color:C.textMuted,fontSize:14,lineHeight:1,cursor:'pointer'}}
                     onTouchStart={e=>{e.currentTarget.style.color=C.danger}}
