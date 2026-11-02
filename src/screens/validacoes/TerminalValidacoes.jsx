@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
-import { insertVisitantes, fetchConsumosPorData, fetchVisitantesPorData, fetchMarcacoesPorPeriodo, deleteConsumo, deleteVisitante, deleteMarcacao } from '../../lib/queries'
+import { insertVisitantes, fetchConsumosPorEmenta, fetchVisitantesPorEmenta, fetchMarcacoesPorPeriodo, deleteConsumo, deleteVisitante, deleteMarcacao } from '../../lib/queries'
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
 import { getMeal, getNextMeal, toMin, fimRefeicao, refeicaoTerminou } from '../../utils/meal'
@@ -112,11 +112,13 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
     }).filter(Boolean))
   }
 
+  // Só a refeição ativa: fora do serviço a lista fica vazia, mesmo depois de Atualizar ou recarregar a página.
   const loadRecentes = async () => {
+    if(!ementaAtual){ setRecentes([]); return }
     const limit = parseInt(s.validacao_sidebar_num) || 10
     const [consumos,vis] = await Promise.all([
-      fetchConsumosPorData(TODAY,limit),
-      fetchVisitantesPorData(TODAY,limit),
+      fetchConsumosPorEmenta(ementaAtual.id,limit),
+      fetchVisitantesPorEmenta(ementaAtual.id,limit),
     ])
     const rows = [
       ...consumos.map(c => {
@@ -136,7 +138,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
 
   // Dependem das props: cada reload traz arrays novos e volta a carregar contadores e recentes.
   useEffect(() => { loadContadores(ementaAtual) }, [ementaAtual])
-  useEffect(() => { loadRecentes() }, [funcionarios, ementas])
+  useEffect(() => { loadRecentes() }, [funcionarios, ementas, ementaAtual?.id])
 
   const refresh = async () => { setRefreshing(true); await reload(); setRefreshing(false) }
 

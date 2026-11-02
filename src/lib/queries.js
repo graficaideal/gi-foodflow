@@ -1,6 +1,5 @@
 import { supabase } from './supabase'
 import { DEFAULTS } from '../constants/settings'
-import { addD } from '../utils/date'
 
 const mapFunc = r => ({...r, foto:r.foto_url})
 
@@ -39,21 +38,19 @@ export const fetchVisitantes = async () => {
   return data || []
 }
 
-export const fetchConsumosPorData = async (data, limit) => {
+export const fetchConsumosPorEmenta = async (ementaId, limit) => {
   const { data:rows } = await supabase.from('cantina_consumos')
     .select('*')
-    .gte('validado_em', `${data}T00:00:00`)
-    .lt('validado_em', `${addD(data,1)}T00:00:00`)
+    .eq('ementa_id', ementaId)
     .order('validado_em', { ascending:false })
     .limit(limit)
   return rows || []
 }
 
-export const fetchVisitantesPorData = async (data, limit) => {
+export const fetchVisitantesPorEmenta = async (ementaId, limit) => {
   const { data:rows } = await supabase.from('cantina_visitantes')
     .select('*')
-    .gte('registado_em', `${data}T00:00:00`)
-    .lt('registado_em', `${addD(data,1)}T00:00:00`)
+    .eq('ementa_id', ementaId)
     .order('registado_em', { ascending:false })
     .limit(limit)
   return rows || []
