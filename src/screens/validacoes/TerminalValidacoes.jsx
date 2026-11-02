@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { insertVisitantes, fetchConsumosPorData, fetchVisitantesPorData, fetchMarcacoesPorPeriodo, deleteConsumo, deleteVisitante, deleteMarcacao } from '../../lib/queries'
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
-import { getMeal, getNextMeal, toMin } from '../../utils/meal'
+import { getMeal, getNextMeal, toMin, fimRefeicao, refeicaoTerminou } from '../../utils/meal'
 import { fmtHM, fmtS, TODAY, WD, MN, addD, proximoDiaUtil } from '../../utils/date'
 import { pratoColors } from '../../constants/pratos'
 import Avatar from '../../components/Avatar'
@@ -283,6 +283,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
   const cancelarMarcacao = async () => {
     if(!desmarcarConfirm) return
     const marc = desmarcarConfirm
+    if(refeicaoTerminou(s,marc.tipo,marc.data,TODAY)){ setDesmarcarConfirm(null); return } // terminou com o modal aberto
     await deleteMarcacao(marc.id)
     setDesmarcarMarcs(p=>p.filter(m=>m.id!==marc.id))
     loadContadores(ementaAtual)
@@ -333,6 +334,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
 
   const marcarPrato = async n => {
     const em = marcarEm
+    if(refeicaoTerminou(s,em.tipo,em.data,TODAY)){ setMarcarEm(null); return } // terminou com o modal aberto
     const {error} = await supabase.from('cantina_marcacoes').upsert({funcionario_id:marcarFunc.id,ementa_id:em.id,prato_num:n},{onConflict:'funcionario_id,ementa_id'})
     if(error){ setMarcarErro('Não foi possível gravar a marcação. Tenta novamente.'); return }
     loadContadores(ementaAtual)
@@ -392,6 +394,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
   },[status,process,showMarcar,showDesmarcar])
 
   const next = getNextMeal(s)
+  const marcarFechado = refeicaoTerminou(s,'A',TODAY,TODAY) && refeicaoTerminou(s,'J',TODAY,TODAY)
 
   // ── Modo manual: mesmo invólucro do login dos terminais (Parte 1) ──
   if (manualMode && !status) {
@@ -468,7 +471,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
             <span style={{display:'flex',animation:refreshing?'spin 0.8s linear infinite':undefined}}><Icon name="refresh" size={24}/></span>
           </button>
           <button onClick={()=>setShowMarc(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Imprimir</button>
-          <button onClick={()=>setShowMarcar(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Marcar</button>
+          <button onClick={()=>setShowMarcar(true)} disabled={marcarFechado} title={marcarFechado?'As refeições de hoje já terminaram':undefined} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:marcarFechado?'not-allowed':'pointer',opacity:marcarFechado?0.45:1}}>Marcar</button>
           <button onClick={()=>setShowDesmarcar(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Desmarcar</button>
           {!isKiosk && (
             <button onClick={onBack} style={{background:'none',border:'none',color:C.textMuted,fontSize:13,cursor:'pointer'}}>← Sair</button>
@@ -941,18 +944,22 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
                       ? <div style={{padding:24,textAlign:'center',color:C.textMuted,fontSize:13}}>A carregar…</div>
                       : desmarcarMarcs.length===0
                       ? <div style={{padding:24,textAlign:'center',color:C.textMuted,fontSize:13}}>Sem marcações por cancelar</div>
-                      : desmarcarMarcs.map(m => (
+                      : desmarcarMarcs.map(m => {
+                        const fechada = refeicaoTerminou(s,m.tipo,m.data,TODAY)
+                        return (
                         <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12}}>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:13,fontWeight:700,color:C.text}}>{m.tipo==='A'?'Almoço':'Jantar'} · {m.data===TODAY?'Hoje':fmtS(m.data)}</div>
                             <div style={{fontSize:12,color:C.textMuted,marginTop:2}}>{m.pratoLabel}</div>
+                            {fechada && <div style={{fontSize:12,fontWeight:600,color:C.textSub,marginTop:2}}>Terminou às {fimRefeicao(s,m.tipo)}</div>}
                           </div>
-                          <button onClick={()=>setDesmarcarConfirm(m)}
-                            style={{height:48,padding:'0 16px',background:C.danger,border:'none',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',flexShrink:0}}>
+                          <button onClick={()=>setDesmarcarConfirm(m)} disabled={fechada}
+                            style={{height:48,padding:'0 16px',background:C.danger,border:'none',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,cursor:fechada?'not-allowed':'pointer',opacity:fechada?0.45:1,flexShrink:0}}>
                             Cancelar marcação
                           </button>
                         </div>
-                      ))}
+                        )
+                      })}
                   </div>
                 </>
               )}
@@ -1011,12 +1018,16 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
                     ? <div style={{padding:24,textAlign:'center',color:C.textMuted,fontSize:13}}>Todas as refeições de hoje já estão marcadas</div>
                     : !marcarEm
                     ? <div style={{display:'flex',gap:10}}>
-                        {marcarRefs.map(em => (
-                          <button key={em.id} onClick={()=>setMarcarEm(em)}
-                            style={{flex:1,minHeight:64,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:16,fontWeight:700,cursor:'pointer'}}>
+                        {marcarRefs.map(em => {
+                          const fechada = refeicaoTerminou(s,em.tipo,em.data,TODAY)
+                          return (
+                          <button key={em.id} onClick={()=>setMarcarEm(em)} disabled={fechada}
+                            style={{flex:1,minHeight:64,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:16,fontWeight:700,cursor:fechada?'not-allowed':'pointer',opacity:fechada?0.45:1}}>
                             {em.tipo==='A'?'Almoço':'Jantar'}
+                            {fechada && <div style={{fontSize:12,fontWeight:600,marginTop:4}}>Terminou às {fimRefeicao(s,em.tipo)}</div>}
                           </button>
-                        ))}
+                          )
+                        })}
                       </div>
                     : <>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
