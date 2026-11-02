@@ -6,6 +6,9 @@
   --prato-peixe-fg: #7ec8f0; --prato-peixe-bg: #0f1e2d; --prato-peixe-bd: #1a3d5c;  /* slot 2 */
   --prato-dieta-fg: #6ee7b7; --prato-dieta-bg: #0d2218; --prato-dieta-bd: #1a5c3a;  /* slot 3 */
   --prato-veg-fg:   #fcd34d; --prato-veg-bg:   #1e1b08; --prato-veg-bd:   #4a420a;  /* slot 4 */
+  /* fg a 25%: fundo de linha identificável de relance, com texto legível por cima */
+  --prato-carne-tint: rgba(244,164,154,.25); --prato-peixe-tint: rgba(126,200,240,.25);
+  --prato-dieta-tint: rgba(110,231,183,.25); --prato-veg-tint:   rgba(252,211,77,.25);
 }
 
 body {

@@ -20,7 +20,7 @@ const PROX_LABEL = [5,6,0].includes(new Date(TODAY+'T12:00:00').getDay()) ? 'Seg
 
 // Cores específicas dos takeovers deste ecrã — não são tokens globais
 const V = {
-  standby:'#0f1217', panel:'#16191f', panelHi:'#1a1f27',
+  standby:'#0f1217', panel:'#16191f',
   ok:'#0d2e22', okCard:'#0a3a2a',
   dup:'#2d2208', dupCard:'#3a2c0a',
   no:'#2a1315', noCard:'#371619', noBtn:'#3f1c1f',
@@ -714,7 +714,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
             ? <div style={{padding:32,textAlign:'center',color:C.textMuted,fontSize:13}}>Sem validações</div>
             : recentes.map((r,i) => {
               return (
-                <div key={r.id} style={{padding:'12px 8px 12px 20px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:12,background:i===0?V.panelHi:'transparent'}}>
+                <div key={r.id} style={{padding:'12px 8px 12px 20px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:12,background:pratoColors(r.pratoNum).tint}}>
                   {r.isVisitante
                     ? <div style={{width:36,height:36,borderRadius:'50%',background:C.surface2,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                         <Icon name="users" size={18} color={C.textMuted}/>
@@ -726,15 +726,15 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
                       {r.isVisitante ? 'Visitantes' : r.nome}
                       {r.isVisitante && <span style={{fontSize:11,fontWeight:800,color:C.yellow}}>×{r.quantidade}</span>}
                     </div>
-                    <div style={{fontSize:11,color:C.textMuted,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    <div style={{fontSize:11,color:C.text,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                       {fmtHM(r.validado_em)} · {r.pratoDesc}
                     </div>
                   </div>
                   <span style={{flexShrink:0}}><PratoTag slot={r.pratoNum} label={r.pratoLabel}/></span>
                   <button onClick={()=>setAnularAlvo(r)} aria-label="Anular validação"
-                    style={{width:44,height:44,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',borderRadius:8,color:C.textMuted,fontSize:14,lineHeight:1,cursor:'pointer'}}
+                    style={{width:44,height:44,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',borderRadius:8,color:C.textSub,fontSize:14,lineHeight:1,cursor:'pointer'}}
                     onTouchStart={e=>{e.currentTarget.style.color=C.danger}}
-                    onTouchEnd={e=>{e.currentTarget.style.color=C.textMuted}}>
+                    onTouchEnd={e=>{e.currentTarget.style.color=C.textSub}}>
                     ✕
                   </button>
                 </div>
