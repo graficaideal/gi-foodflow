@@ -40,7 +40,7 @@ function Pessoa({func, ring, avatar=220, font=60, width=360, metaColor}) {
   )
 }
 
-export default function TerminalValidacoes({funcionarios,ementas,settings,onBack}) {
+export default function TerminalValidacoes({funcionarios,ementas,settings,reload,onBack}) {
   const s = {...DEFAULTS,...settings}
   const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'
   const [numInput,   setNumInput]   = useState('')
@@ -74,6 +74,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
   const [marcarRefs,  setMarcarRefs]  = useState(null)  // ementas de hoje por marcar; null = a carregar
   const [marcarEm,    setMarcarEm]    = useState(null)  // ementa escolhida, à espera do prato
   const [marcarErro,  setMarcarErro]  = useState('')
+  const [refreshing,  setRefreshing]  = useState(false)
 
   // Relógio: reavalia getMeal() periodicamente
   useEffect(() => {
@@ -144,8 +145,11 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
     setRecentes(rows)
   }
 
-  useEffect(() => { loadContadores(ementaAtual) }, [ementaAtual?.id])
-  useEffect(() => { loadRecentes() }, [])
+  // Dependem das props: cada reload traz arrays novos e volta a carregar contadores e recentes.
+  useEffect(() => { loadContadores(ementaAtual) }, [ementaAtual])
+  useEffect(() => { loadRecentes() }, [funcionarios, ementas])
+
+  const refresh = async () => { setRefreshing(true); await reload(); setRefreshing(false) }
 
   const confirmarConsumo = async (func,ementa,pratoNum) => {
     const {data,error} = await supabase.from('cantina_consumos').insert({funcionario_id:func.id,ementa_id:ementa.id,prato_num:pratoNum}).select().single()
@@ -454,7 +458,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
       )
     }
     return (
-      <div style={{height:50,padding:'0 28px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,position:'relative',zIndex:1}}>
+      <div style={{height:72,padding:'0 28px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,position:'relative',zIndex:1}}>
         <Logo size="sm" showSub={false}/>
         <div style={{display:'flex',alignItems:'center',gap:16}}>
           <span style={{fontSize:13,color:C.textSub}}>{mealTag?`${mealTag} · `:''}{dateStr} · <strong style={{color:C.text}}>{timeStr}</strong></span>
@@ -471,6 +475,9 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,onBack
             : navigator.serial
             ? <button onClick={connectSerial} style={{fontSize:12,fontWeight:600,color:C.yellow,background:C.yellow+'18',border:`1px solid ${C.yellow}55`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>{serialStatus==='error'?'⚠ Religar':'Conectar leitor'}</button>
             : null}
+          <button onClick={refresh} disabled={refreshing} aria-label="Atualizar" style={{width:60,height:60,flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',cursor:refreshing?'default':'pointer'}}>
+            <span style={{display:'flex',animation:refreshing?'spin 0.8s linear infinite':undefined}}><Icon name="refresh" size={24}/></span>
+          </button>
           <button onClick={()=>setShowMarc(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Imprimir</button>
           <button onClick={()=>setShowMarcar(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Marcar</button>
           <button onClick={()=>setShowDesmarcar(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Desmarcar</button>

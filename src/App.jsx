@@ -59,7 +59,7 @@ export default function App() {
 
   if (mode==='selector')   return <ModeSelector onSelect={setMode}/>
   if (mode==='marcacoes')  return <><ErrBar/><TerminalMarcacoes  {...shared} reload={reload} onBack={()=>setMode('selector')}/></>
-  if (mode==='validacoes') return <><ErrBar/><TerminalValidacoes {...shared} onBack={()=>setMode('selector')}/></>
+  if (mode==='validacoes') return <><ErrBar/><TerminalValidacoes {...shared} reload={reload} onBack={()=>setMode('selector')}/></>
   if (mode==='backoffice' && !boOk) return <BackofficePin pin={settings.backoffice_pin} onBack={()=>setMode('selector')}
     onOk={()=>setBoOk(true)}/>
   if (mode==='backoffice') return <><ErrBar/><Backoffice {...shared} marcacoesAll={marcacoesAll} consumos={consumos} visitantes={visitantes} reload={reload} onBack={()=>{ setBoOk(false); setMode('selector') }}/></>
