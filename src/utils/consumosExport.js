@@ -24,6 +24,19 @@ export const exportRows = sorted => {
   return rows
 }
 
+// Grupos do acordeão: um por funcionário, por Nº numérico, e os visitantes (sem nome) no fim. Os registos mantêm a ordem recebida.
+export const agruparPorFuncionario = sorted => {
+  const by = new Map()
+  for (const c of sorted) {
+    const key = c.nome ? String(c.numero) : 'visitantes'
+    const g = by.get(key) || {key, nome:c.nome, foto:c.foto, numero:c.numero, total:0, itens:[]}
+    g.total += c.quantidade
+    g.itens.push(c)
+    by.set(key, g)
+  }
+  return [...by.values()].sort((x, y) => !x.nome - !y.nome || String(x.numero).localeCompare(String(y.numero), undefined, {numeric:true}))
+}
+
 // Linhas de contexto: período, filtros e totais
 export const exportSummary = ({fStart, fEnd, fMeal, fEstado, q, stats}) => [
   `Período: ${fStart ? dmy(fStart) : '…'} a ${fEnd ? dmy(fEnd) : '…'}`,

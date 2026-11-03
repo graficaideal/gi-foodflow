@@ -1,9 +1,21 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { exportRows, exportSummary, printHtml, HEADERS } from './consumosExport.js'
+import { agruparPorFuncionario, exportRows, exportSummary, printHtml, HEADERS } from './consumosExport.js'
 
 const c = (numero, nome, tipo, extra = {}) => ({numero, nome, tipo, quantidade:1, ...extra})
 const vis = (tipo, quantidade) => ({tipo, quantidade})
+
+test('agruparPorFuncionario: ordena por Nº numérico, visitantes no fim, total soma quantidades e mantém a ordem dos registos', () => {
+  const grupos = agruparPorFuncionario([
+    c('169', 'Bruno', 'A', {key:'b1'}), vis('J', 4), c('12', 'Ana', 'J', {key:'a1'}), c('169', 'Bruno', 'J', {key:'b2', automatico:true}), vis('A', 2),
+  ])
+  assert.deepEqual(grupos.map(g => [g.key, g.nome, g.total]), [['12', 'Ana', 1], ['169', 'Bruno', 2], ['visitantes', undefined, 6]])
+  assert.deepEqual(grupos[1].itens.map(i => i.key), ['b1', 'b2'])
+})
+
+test('agruparPorFuncionario: sem registos não há grupos', () => {
+  assert.deepEqual(agruparPorFuncionario([]), [])
+})
 
 test('exportRows: agrupa por funcionário, ordena por Nº numérico, visitantes e TOTAL no fim', () => {
   const rows = exportRows([

@@ -1,22 +1,24 @@
 import { useState } from 'react'
 import { C } from '../../constants/colors'
-import { monthRange, fmtS, fmtHM } from '../../utils/date'
+import { monthRange, fmtS } from '../../utils/date'
 import { matchFunc } from '../../utils/text'
 import Avatar from '../../components/Avatar'
 import PratoTag from '../../components/PratoTag'
 import Icon from '../../components/Icon'
 import KpiLine from '../../components/KpiLine'
 import { PeriodFilter, SearchInput, pill } from '../../components/Filters'
-import { HEADERS, exportRows, exportSummary, printHtml } from '../../utils/consumosExport'
+import { HEADERS, agruparPorFuncionario, exportRows, exportSummary, printHtml } from '../../utils/consumosExport'
 
-const COLS = '1fr 120px 95px 105px 60px 72px'
-const TH   = {fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.1em'}
+const COLS = '120px 110px 120px 1fr'   // registos dentro de um grupo
+const TH   ={fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.1em'}
 
 export default function SecConsumos({consumos, visitantes=[], funcionarios, ementas}) {
   const [[fStart, fEnd], setPeriod] = useState(() => monthRange(0))
   const [fMeal,  setFMeal]  = useState('')
   const [q,      setQ]      = useState('')
   const [fEstado,setFEstado]= useState('')   // '' | 'C' consumidos | 'N' não consumidos (automatico)
+  const [abertos,setAbertos]= useState([])   // chaves dos grupos expandidos
+  const alternar = key => setAbertos(a => a.includes(key) ? a.filter(k => k !== key) : [...a, key])
 
   const enriched = consumos.map(c => {
     const fn = funcionarios.find(f => f.id === c.funcionario_id)
@@ -122,48 +124,56 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
         <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden'}}>
 
           {/* Header */}
-          <div style={{display:'grid',gridTemplateColumns:COLS,padding:'10px 18px',gap:14,background:C.surface2,borderBottom:`1px solid ${C.border}`,alignItems:'center'}}>
-            {['Funcionário','Data','Refeição','Prato','Qtd','Hora'].map(h => (
-              <div key={h} style={TH}>{h}</div>
-            ))}
+          <div style={{display:'flex',justifyContent:'space-between',padding:'10px 18px',gap:14,background:C.surface2,borderBottom:`1px solid ${C.border}`}}>
+            {['Funcionário','Total'].map(h => <div key={h} style={TH}>{h}</div>)}
           </div>
 
-          {/* Rows */}
+          {/* Grupos */}
           {sorted.length === 0
             ? <div style={{padding:'44px 0',textAlign:'center',color:C.textMuted,fontSize:13,fontStyle:'italic'}}>
                 {consumos.length === 0 && visitantes.length === 0 ? 'Sem consumos registados.' : 'Sem registos para os filtros aplicados.'}
               </div>
-            : sorted.map(c => (
-              <div key={c.key}
-                onMouseEnter={e => e.currentTarget.style.background = C.surface2}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                style={{display:'grid',gridTemplateColumns:COLS,padding:'10px 18px',gap:14,borderTop:`1px solid ${C.border}`,alignItems:'center',transition:'background 0.1s'}}>
-                {c.nome
-                  ? <div style={{display:'flex',alignItems:'center',gap:10}}>
-                      <Avatar nome={c.nome} foto={c.foto} size={30}/>
-                      <div>
-                        <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:8}}>
-                          {c.nome}
-                          {c.automatico && <span title="Marcou mas não validou; registado no fecho da refeição"
-                            style={{fontSize:10,fontWeight:700,letterSpacing:'0.04em',padding:'2px 7px',borderRadius:99,color:C.warn,background:`${C.warn}1a`,border:`1px solid ${C.warn}44`}}>NÃO CONSUMIDO</span>}
+            : agruparPorFuncionario(sorted).map((g, i) => {
+              const aberto = abertos.includes(g.key)
+              return (
+                <div key={g.key} style={{borderTop:i ? `1px solid ${C.border}` : 'none'}}>
+                  <button onClick={() => alternar(g.key)} aria-expanded={aberto}
+                    onMouseEnter={e => e.currentTarget.style.background = C.surface2}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 18px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left',transition:'background 0.1s'}}>
+                    <span style={{display:'flex',flexShrink:0,transform:aberto?'rotate(90deg)':'none',transition:'transform 0.15s'}}><Icon name="chev-r" size={16} color={C.textMuted}/></span>
+                    {g.nome
+                      ? <Avatar nome={g.nome} foto={g.foto} size={30}/>
+                      : <div style={{width:30,height:30,borderRadius:'50%',background:C.surface2,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <Icon name="users" size={15} color={C.textMuted}/>
                         </div>
-                        <div style={{fontSize:11,color:C.textMuted}}>Nº {c.numero}</div>
+                    }
+                    <div style={{flex:1,minWidth:0}}>
+                      {g.nome
+                        ? <>
+                            <div style={{fontSize:13,fontWeight:600,color:C.text}}>{g.nome}</div>
+                            <div style={{fontSize:11,color:C.textMuted}}>Nº {g.numero}</div>
+                          </>
+                        : <div style={{fontSize:13,fontStyle:'italic',color:C.textSub}}>Visitante(s)</div>
+                      }
+                    </div>
+                    <div style={{fontSize:15,fontWeight:800,color:C.yellow,flexShrink:0}}>{g.total}</div>
+                  </button>
+                  {aberto && g.itens.map(c => (
+                    <div key={c.key} style={{display:'grid',gridTemplateColumns:COLS,padding:'8px 18px 8px 44px',gap:14,borderTop:`1px solid ${C.border}`,alignItems:'center',background:C.bg}}>
+                      <div style={{fontSize:12,color:C.textSub}}>{fmtS(c.data)}</div>
+                      <div style={{fontSize:13,color:C.textSub}}>{c.tipo === 'A' ? '🌞 Almoço' : '🌙 Jantar'}</div>
+                      <PratoTag slot={c.pratoNum} label={c.pratoLabel}/>
+                      <div>
+                        {c.automatico && <span title="Marcou mas não validou; registado no fecho da refeição"
+                          style={{fontSize:10,fontWeight:700,letterSpacing:'0.04em',padding:'2px 7px',borderRadius:99,color:C.warn,background:`${C.warn}1a`,border:`1px solid ${C.warn}44`}}>NÃO CONSUMIDO</span>}
+                        {!c.nome && <span style={{fontSize:13,fontWeight:800,color:C.yellow}}>×{c.quantidade}</span>}
                       </div>
                     </div>
-                  : <div style={{display:'flex',alignItems:'center',gap:10}}>
-                      <div style={{width:30,height:30,borderRadius:'50%',background:C.surface2,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                        <Icon name="users" size={15} color={C.textMuted}/>
-                      </div>
-                      <div style={{fontSize:13,fontStyle:'italic',color:C.textSub}}>Visitante(s)</div>
-                    </div>
-                }
-                <div style={{fontSize:12,color:C.textSub}}>{fmtS(c.data)}</div>
-                <div style={{fontSize:13,color:C.textSub}}>{c.tipo === 'A' ? '🌞 Almoço' : '🌙 Jantar'}</div>
-                <PratoTag slot={c.pratoNum} label={c.pratoLabel}/>
-                <div style={{fontSize:c.nome?12:15,fontWeight:c.nome?400:800,color:c.nome?C.textMuted:C.yellow,fontFamily:c.nome?'monospace':'inherit'}}>{c.quantidade}</div>
-                <div style={{fontSize:12,color:C.textMuted,fontFamily:'monospace'}}>{fmtHM(c.ts)}</div>
-              </div>
-            ))
+                  ))}
+                </div>
+              )
+            })
           }
         </div>
       </div>
