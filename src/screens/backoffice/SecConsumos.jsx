@@ -135,12 +135,13 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
               </div>
             : agruparPorFuncionario(sorted).map((g, i) => {
               const aberto = abertos.includes(g.key)
+              const fundo = g.naoConsumidos ? `${C.orange}14` : 'transparent'
               return (
                 <div key={g.key} style={{borderTop:i ? `1px solid ${C.border}` : 'none'}}>
                   <button onClick={() => alternar(g.key)} aria-expanded={aberto}
                     onMouseEnter={e => e.currentTarget.style.background = C.surface2}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 18px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left',transition:'background 0.1s'}}>
+                    onMouseLeave={e => e.currentTarget.style.background = fundo}
+                    style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 18px',background:fundo,border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left',transition:'background 0.1s'}}>
                     <span style={{display:'flex',flexShrink:0,transform:aberto?'rotate(90deg)':'none',transition:'transform 0.15s'}}><Icon name="chev-r" size={16} color={C.textMuted}/></span>
                     {g.nome
                       ? <Avatar nome={g.nome} foto={g.foto} size={30}/>
@@ -157,7 +158,10 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
                         : <div style={{fontSize:13,fontStyle:'italic',color:C.textSub}}>Visitante(s)</div>
                       }
                     </div>
-                    <div style={{fontSize:15,fontWeight:800,color:C.yellow,flexShrink:0}}>{g.total}</div>
+                    <div style={{fontSize:13,fontWeight:700,flexShrink:0}}>
+                      <span style={{color:C.yellow}}>{g.total} {g.total === 1 ? 'consumo' : 'consumos'}</span>
+                      {g.naoConsumidos > 0 && <span style={{color:C.orange}}> · {g.naoConsumidos} {g.naoConsumidos === 1 ? 'não consumido' : 'não consumidos'}</span>}
+                    </div>
                   </button>
                   {aberto && g.itens.map(c => (
                     <div key={c.key} style={{display:'grid',gridTemplateColumns:COLS,padding:'8px 18px 8px 44px',gap:14,borderTop:`1px solid ${C.border}`,alignItems:'center',background:C.bg}}>
@@ -166,7 +170,7 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
                       <PratoTag slot={c.pratoNum} label={c.pratoLabel}/>
                       <div>
                         {c.automatico && <span title="Marcou mas não validou; registado no fecho da refeição"
-                          style={{fontSize:10,fontWeight:700,letterSpacing:'0.04em',padding:'2px 7px',borderRadius:99,color:C.warn,background:`${C.warn}1a`,border:`1px solid ${C.warn}44`}}>NÃO CONSUMIDO</span>}
+                          style={{fontSize:10,fontWeight:700,letterSpacing:'0.04em',padding:'2px 7px',borderRadius:99,color:C.orange,background:`${C.orange}1a`,border:`1px solid ${C.orange}44`}}>NÃO CONSUMIDO</span>}
                         {!c.nome && <span style={{fontSize:13,fontWeight:800,color:C.yellow}}>×{c.quantidade}</span>}
                       </div>
                     </div>

@@ -5,4 +5,5 @@ export const C = {
   success:'#34d399', successBg:'#0d2e22',
   danger:'#f87171',  dangerBg:'#2d1515',
   warn:'#fbbf24',    warnBg:'#2d2208',
+  orange:'#fb923c',
 }

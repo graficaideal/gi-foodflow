@@ -11,6 +11,7 @@ test('agruparPorFuncionario: ordena por Nº numérico, visitantes no fim, total 
   ])
   assert.deepEqual(grupos.map(g => [g.key, g.nome, g.total]), [['12', 'Ana', 1], ['169', 'Bruno', 2], ['visitantes', undefined, 6]])
   assert.deepEqual(grupos[1].itens.map(i => i.key), ['b1', 'b2'])
+  assert.deepEqual(grupos.map(g => g.naoConsumidos), [0, 1, 0])
 })
 
 test('agruparPorFuncionario: sem registos não há grupos', () => {

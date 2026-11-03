@@ -29,8 +29,9 @@ export const agruparPorFuncionario = sorted => {
   const by = new Map()
   for (const c of sorted) {
     const key = c.nome ? String(c.numero) : 'visitantes'
-    const g = by.get(key) || {key, nome:c.nome, foto:c.foto, numero:c.numero, total:0, itens:[]}
+    const g = by.get(key) || {key, nome:c.nome, foto:c.foto, numero:c.numero, total:0, naoConsumidos:0, itens:[]}
     g.total += c.quantidade
+    if (c.automatico) g.naoConsumidos += c.quantidade
     g.itens.push(c)
     by.set(key, g)
   }
