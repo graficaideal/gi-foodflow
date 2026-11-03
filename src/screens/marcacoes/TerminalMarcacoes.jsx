@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
-import { WD, WD_FULL, MN, TODAY, addD, d2s } from '../../utils/date'
+import { WD, WD_FULL, MN, addD } from '../../utils/date'
 import { fmtHorario } from '../../utils/meal'
 import { diasMarcaveis, marcacoesNaoConsumidas } from '../../utils/marcar'
+import { week0 } from '../../utils/ementaGrid'
 import { fetchDiasFechados, fetchMarcacoesEConsumos } from '../../lib/queries'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
@@ -15,9 +16,6 @@ import { pratoColors } from '../../constants/pratos'
 import useSerial from '../../hooks/useSerial'
 
 const MEALS = [{tipo:'A',emoji:'🌞',label:'Almoço'},{tipo:'J',emoji:'🌙',label:'Jantar'}]
-
-// Segunda-feira da semana 0. Ao fim de semana, a semana 0 é a seguinte.
-const WEEK0 = (() => { const wd = new Date(TODAY+'T12:00:00').getDay(); return addD(TODAY, wd===0 ? 1 : wd===6 ? 2 : 1-wd) })()
 
 // Abaixo de 1200px (POS 1024×768): layout compacto
 const NARROW = '(max-width:1199px)'
@@ -96,7 +94,7 @@ function MealButton({emoji, label, hour, on, pratoLabel, locked, past, onClick})
 const fmtDia = d => { const x=new Date(d+'T12:00:00'); return `${WD_FULL[x.getDay()].split('-')[0].toLowerCase()}, ${String(x.getDate()).padStart(2,'0')} ${MN[x.getMonth()]}` }
 
 // Painel lateral: marcações de hoje em diante, agrupadas por dia. Eliminar = 2 toques; linha bloqueada sem ação.
-function MinhasMarcacoes({items, total, narrow, s, isLocked, confirmId, setConfirmId, onRemove, onOpen, onClose}) {
+function MinhasMarcacoes({items, total, narrow, s, today, isLocked, confirmId, setConfirmId, onRemove, onOpen, onClose}) {
   const groups = []
   items.forEach(it => { const g=groups[groups.length-1]; g?.data===it.em.data ? g.items.push(it) : groups.push({data:it.em.data,items:[it]}) })
   return (
@@ -123,7 +121,7 @@ function MinhasMarcacoes({items, total, narrow, s, isLocked, confirmId, setConfi
             <div key={g.data} style={{marginTop:14}}>
               <div style={{display:'flex',alignItems:'center',gap:10,padding:'0 6px 8px'}}>
                 <span style={{fontSize:15,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase',color:C.textSub}}>{fmtDia(g.data)}</span>
-                {g.data===TODAY && <span style={{fontSize:10,fontWeight:800,letterSpacing:'0.1em',padding:'3px 6px',borderRadius:6,background:C.yellow,color:C.bg}}>HOJE</span>}
+                {g.data===today && <span style={{fontSize:10,fontWeight:800,letterSpacing:'0.1em',padding:'3px 6px',borderRadius:6,background:C.yellow,color:C.bg}}>HOJE</span>}
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
                 {g.items.map(({em,meal,n}) => {
@@ -198,7 +196,7 @@ function AvisoNaoConsumidas({items, onClose}) {
   )
 }
 
-export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,settings,reload,onBack}) {
+export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,settings,today,reload,onBack}) {
   const s = {...DEFAULTS,...settings}
   const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'
   const [step,      setStep]      = useState('numero')
@@ -206,7 +204,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
   const [pinInput,  setPinInput]  = useState('')
   const [func,      setFunc]      = useState(null)
   const [err,       setErr]       = useState('')
-  const [selDay,    setSelDay]    = useState(TODAY)
+  const [selDay,    setSelDay]    = useState(null)   // null = dia por omissão, calculado a partir de hoje
   const [weekOffset,setWeekOffset]= useState(0)
   const [selMeal,   setSelMeal]   = useState(null)   // 'A' | 'J' | null
   const [marcacoes, setMarcacoes] = useState([])
@@ -219,6 +217,8 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
   const [naoConsumidas,setNaoConsumidas] = useState([])
   const toastTimer = useRef(null)
   const narrow = useNarrow()
+  // Novo dia: a semana 0 e o dia por omissão mudam; a seleção anterior deixa de fazer sentido.
+  useEffect(() => { setSelDay(null); setSelMeal(null); setWeekOffset(0) }, [today])
   // Dias encerrados não existem para o terminal: sem ementa, sem marcação.
   const ementas = todasEmentas.filter(e => !fechados.includes(e.data))
 
@@ -263,12 +263,11 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
     setNaoConsumidas([])
     if (!funcId) return
     let ativo = true
-    const hoje = d2s(new Date())   // não TODAY: o quiosque fica aberto vários dias
-    Promise.all([fetchMarcacoesEConsumos(funcId, addD(hoje,-30), hoje), fetchDiasFechados()])
+    Promise.all([fetchMarcacoesEConsumos(funcId, addD(today,-30), today), fetchDiasFechados()])
       .then(([{marcacoes,consumos},dias]) => { if (ativo) setNaoConsumidas(marcacoesNaoConsumidas(marcacoes,consumos,dias,lerVistos())) })
       .catch(() => {})   // aviso informativo: sem dados fiáveis, não mostra
     return () => { ativo = false }
-  }, [funcId])
+  }, [funcId, today])
   const fecharAviso = () => { guardarVistos(naoConsumidas.map(m=>m.id)); setNaoConsumidas([]) }
 
   const loginFunc = (f, viaRfid = false) => {
@@ -289,7 +288,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
     else{setErr('PIN incorreto');setPinInput('');setTimeout(()=>setErr(''),3000)}
   }
 
-  const logout = () => {setStep('numero');setFunc(null);setNumInput('');setPinInput('');setErr('');setSelDay(TODAY);setSelMeal(null);setWeekOffset(0);setMarcacoes([]);setListOpen(false);setConfirmId(null)}
+  const logout = () => {setStep('numero');setFunc(null);setNumInput('');setPinInput('');setErr('');setSelDay(null);setSelMeal(null);setWeekOffset(0);setMarcacoes([]);setListOpen(false);setConfirmId(null)}
 
   if (step==='numero') {
     const leftPanel = (
@@ -335,17 +334,18 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
   }
 
   const bloqueado = s.bloquear_dia_proprio==='true'
+  const WEEK0 = week0(today)
 
   // Semana de trabalho (seg–sex) sem os dias encerrados. Se selDay não pertence à semana visível, seleciona o 1.º dia não passado.
-  const daysOf   = off => diasMarcaveis(TODAY, off, fechados)
+  const daysOf   = off => diasMarcaveis(today, off, fechados)
   const weekDays = daysOf(weekOffset)
-  const day      = weekDays.includes(selDay) ? selDay : (weekDays.find(d=>d>=TODAY) || weekDays[0])   // undefined se a semana está toda encerrada
+  const day      = weekDays.includes(selDay) ? selDay : (weekDays.find(d=>d>=today) || weekDays[0])   // undefined se a semana está toda encerrada
   const hasPrev  = weekOffset > 0
   const hasNext  = ementas.some(e=>e.data>addD(WEEK0, weekOffset*7+4))
   // Mudar de dia ou de semana limpa SEMPRE a refeição: obriga a confirmar a refeição em cada dia.
   const selectDay = d => { setSelDay(d); setSelMeal(null) }
-  const goWeek   = off => { const w=daysOf(off); setWeekOffset(off); selectDay(w.find(d=>d>=TODAY) || w[0]) }
-  const isLocked = d => d<TODAY || (d===TODAY && bloqueado)
+  const goWeek   = off => { const w=daysOf(off); setWeekOffset(off); selectDay(w.find(d=>d>=today) || w[0]) }
+  const isLocked = d => d<today || (d===today && bloqueado)
 
   const dayEm  = ementas.filter(e=>e.data===day)
   const getM   = eid => marcacoes.find(m=>m.funcionario_id===func.id&&m.ementa_id===eid)
@@ -365,7 +365,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
   const doMarcar   = async (em,n,label,pratoLabel) => { if (await marcar(em,n)) flash('Erro ao guardar',true); else flash(`${label} de ${dia} · ${pratoLabel}`) }
   const doCancelar = async (em,label,verbo='desmarcado') => { if (await cancelar(em.id)) flash('Erro ao guardar',true); else flash(`${label} de ${fmtDia(em.data)} ${verbo}`) }
 
-  const futureIds = new Set(ementas.filter(e=>e.data>=TODAY).map(e=>e.id))
+  const futureIds = new Set(ementas.filter(e=>e.data>=today).map(e=>e.id))
   const nFuturas  = marcacoes.filter(m=>futureIds.has(m.ementa_id)).length
   const minhas    = ementas.filter(e=>futureIds.has(e.id)).map(em=>({em,meal:MEALS.find(m=>m.tipo===em.tipo),n:getM(em.id)?.prato_num})).filter(x=>x.n&&x.meal)
     .sort((a,b)=>a.em.data.localeCompare(b.em.data)||a.em.tipo.localeCompare(b.em.tipo))
@@ -416,7 +416,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
         <button disabled={!hasPrev} onClick={()=>goWeek(weekOffset-1)} aria-label="Semana anterior" style={arrow(!hasPrev)}><Icon name="chev-l" size={30}/></button>
         {weekDays.map(d => {
           const marks = Object.fromEntries(MEALS.map(m => { const e=ementas.find(e=>e.data===d&&e.tipo===m.tipo); return [m.tipo, !!(e&&getM(e.id))] }))
-          return <DayChip key={d} d={d} sel={day===d} isToday={d===TODAY} past={d<TODAY} marks={marks} locked={isLocked(d)} onClick={()=>selectDay(d)}/>
+          return <DayChip key={d} d={d} sel={day===d} isToday={d===today} past={d<today} marks={marks} locked={isLocked(d)} onClick={()=>selectDay(d)}/>
         })}
         <button disabled={!hasNext} onClick={()=>goWeek(weekOffset+1)} aria-label="Semana seguinte" style={arrow(!hasNext)}><Icon name="chev-r" size={30}/></button>
       </div>
@@ -446,7 +446,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
                 const e=dayEm.find(e=>e.tipo===tipo); if(!e) return null
                 const m=getM(e.id)
                 return <MealButton key={tipo} emoji={emoji} label={label} hour={fmtHorario(s,tipo)} on={selMeal===tipo}
-                  pratoLabel={m && e[`prato${m.prato_num}_label`]} locked={locked} past={day<TODAY} onClick={()=>setSelMeal(tipo)}/>
+                  pratoLabel={m && e[`prato${m.prato_num}_label`]} locked={locked} past={day<today} onClick={()=>setSelMeal(tipo)}/>
               })}
             </div>
             <div style={{padding:16,minHeight:0,display:'flex'}}>
@@ -472,7 +472,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
         )}
       </div>
 
-      {listOpen && <MinhasMarcacoes items={minhas} total={nFuturas} narrow={narrow} s={s} isLocked={isLocked}
+      {listOpen && <MinhasMarcacoes items={minhas} total={nFuturas} narrow={narrow} s={s} today={today} isLocked={isLocked}
         confirmId={confirmId} setConfirmId={setConfirmId} onRemove={removeFromList} onOpen={openFromList} onClose={closeList}/>}
 
       {naoConsumidas.length>0 && <AvisoNaoConsumidas items={naoConsumidas} onClose={fecharAviso}/>}

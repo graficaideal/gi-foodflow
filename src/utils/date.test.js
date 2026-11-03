@@ -1,6 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { monthRange, proximoDiaUtil } from './date.js'
+import { hoje, monthRange, proximoDiaUtil } from './date.js'
+
+test('hoje: acompanha o relógio depois da meia-noite, sem recarregar o módulo', t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 3, 23, 59, 59) })
+  assert.equal(hoje(), '2026-11-03')
+  t.mock.timers.tick(1000)
+  assert.equal(hoje(), '2026-11-04')
+})
 
 test('monthRange: mês atual e anterior, com fevereiro bissexto e viragem de ano', () => {
   assert.deepEqual(monthRange(0,  new Date(2026, 9, 29)), ['2026-10-01', '2026-10-31'])

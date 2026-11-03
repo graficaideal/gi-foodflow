@@ -4,7 +4,7 @@ import { insertVisitantes, fetchConsumosPorEmenta, fetchVisitantesPorEmenta, fet
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
 import { getMeal, getNextMeal, toMin, fimRefeicao, refeicaoTerminou } from '../../utils/meal'
-import { fmtHM, fmtS, TODAY, WD, MN, addD, proximoDiaUtil } from '../../utils/date'
+import { fmtHM, fmtS, hoje, WD, MN, addD, proximoDiaUtil } from '../../utils/date'
 import { pratoColors } from '../../constants/pratos'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
@@ -14,9 +14,6 @@ import PratoTag from '../../components/PratoTag'
 import PratoBtn from '../../components/PratoBtn'
 import useSerial from '../../hooks/useSerial'
 import { refeicoesPorMarcar, faltamServir } from '../../utils/marcar'
-
-// Botão "Amanhã" da impressão: de sexta a domingo passa a ser a segunda-feira seguinte (ver proximoDiaUtil)
-const PROX_LABEL = [5,6,0].includes(new Date(TODAY+'T12:00:00').getDay()) ? 'Segunda-feira' : 'Amanhã'
 
 // Cores específicas dos takeovers deste ecrã — não são tokens globais
 const V = {
@@ -40,8 +37,10 @@ function Pessoa({func, ring, avatar=220, font=60, width=360, metaColor}) {
   )
 }
 
-export default function TerminalValidacoes({funcionarios,ementas,settings,reload,onBack}) {
+export default function TerminalValidacoes({funcionarios,ementas,settings,today,reload,onBack}) {
   const s = {...DEFAULTS,...settings}
+  // Botão "Amanhã" da impressão: de sexta a domingo passa a ser a segunda-feira seguinte (ver proximoDiaUtil)
+  const PROX_LABEL = [5,6,0].includes(new Date(today+'T12:00:00').getDay()) ? 'Segunda-feira' : 'Amanhã'
   const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'
   const [numInput,   setNumInput]   = useState('')
   const [status,     setStatus]     = useState(null)
@@ -54,8 +53,8 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
   const [tick,       setTick]       = useState(0)   // força re-render a cada 30s
   const [showMarc,    setShowMarc]    = useState(false)
   const [marcPeriodo, setMarcPeriodo] = useState('amanha') // 'hoje' | 'amanha' | 'entre'
-  const [marcDe,       setMarcDe]     = useState(TODAY)
-  const [marcAte,      setMarcAte]    = useState(TODAY)
+  const [marcDe,       setMarcDe]     = useState(today)
+  const [marcAte,      setMarcAte]    = useState(today)
   const [marcRefeicao, setMarcRefeicao] = useState('ambos') // 'A' | 'J' | 'ambos'
   const [marcDetalhada,setMarcDetalhada]= useState(true)    // false → só cabeçalho + totais
   const [marcsAtuais, setMarcsAtuais] = useState([])
@@ -76,6 +75,9 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
   const [marcarErro,  setMarcarErro]  = useState('')
   const [refreshing,  setRefreshing]  = useState(false)
 
+  // Novo dia: as datas do "Entre datas" voltam a hoje
+  useEffect(() => { setMarcDe(today); setMarcAte(today) }, [today])
+
   // Relógio: reavalia getMeal() periodicamente
   useEffect(() => {
     const id = setInterval(() => setTick(t=>t+1), 30000)
@@ -94,7 +96,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
 
   const reset = () => { setNumInput(''); setStatus(null); setManualMode(false) }
 
-  const ementaAtual = meal ? ementas.find(e=>e.data===TODAY&&e.tipo===meal) : null
+  const ementaAtual = meal ? ementas.find(e=>e.data===today&&e.tipo===meal) : null
 
   const loadContadores = async em => {
     if(!em){ setContadores([]); setMarcsAtuais([]); setConsAtuais([]); return }
@@ -167,8 +169,8 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
   }
 
   const imprimirMarcacoes = async () => {
-    const dataInicio = marcPeriodo==='hoje' ? TODAY : marcPeriodo==='amanha' ? proximoDiaUtil(TODAY) : marcDe
-    const dataFim     = marcPeriodo==='hoje' ? TODAY : marcPeriodo==='amanha' ? proximoDiaUtil(TODAY) : marcAte
+    const dataInicio = marcPeriodo==='hoje' ? today : marcPeriodo==='amanha' ? proximoDiaUtil(today) : marcDe
+    const dataFim     = marcPeriodo==='hoje' ? today : marcPeriodo==='amanha' ? proximoDiaUtil(today) : marcAte
     const rows = await fetchMarcacoesPorPeriodo(dataInicio,dataFim)
     const enriched = rows
       .filter(r => marcRefeicao==='ambos' || r.tipo===marcRefeicao)
@@ -266,7 +268,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
   const selecionarFuncDesmarcar = async func => {
     setDesmarcarFunc(func)
     setDesmarcarMarcs(null)
-    const emsFuturas = ementas.filter(e=>e.data>=TODAY&&(e.tipo==='A'||e.tipo==='J'))
+    const emsFuturas = ementas.filter(e=>e.data>=today&&(e.tipo==='A'||e.tipo==='J'))
     const emIds = emsFuturas.map(e=>e.id)
     if(emIds.length===0){ setDesmarcarMarcs([]); return }
     const [{data:marcs},{data:cons}] = await Promise.all([
@@ -285,7 +287,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
   const cancelarMarcacao = async () => {
     if(!desmarcarConfirm) return
     const marc = desmarcarConfirm
-    if(refeicaoTerminou(s,marc.tipo,marc.data,TODAY)){ setDesmarcarConfirm(null); return } // terminou com o modal aberto
+    if(refeicaoTerminou(s,marc.tipo,marc.data,today)){ setDesmarcarConfirm(null); return } // terminou com o modal aberto
     await deleteMarcacao(marc.id)
     setDesmarcarMarcs(p=>p.filter(m=>m.id!==marc.id))
     loadContadores(ementaAtual)
@@ -329,14 +331,14 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
     if(!func){ setMarcarFunc(false); return }
     setMarcarFunc(func)
     setMarcarRefs(null)
-    const emsHoje = ementas.filter(e=>e.data===TODAY)
+    const emsHoje = ementas.filter(e=>e.data===today)
     const {data} = emsHoje.length===0 ? {data:[]} : await supabase.from('cantina_marcacoes').select('ementa_id').eq('funcionario_id',func.id).in('ementa_id',emsHoje.map(e=>e.id))
-    setMarcarRefs(refeicoesPorMarcar(emsHoje, data||[], TODAY))
+    setMarcarRefs(refeicoesPorMarcar(emsHoje, data||[], today))
   }
 
   const marcarPrato = async n => {
     const em = marcarEm
-    if(refeicaoTerminou(s,em.tipo,em.data,TODAY)){ setMarcarEm(null); return } // terminou com o modal aberto
+    if(refeicaoTerminou(s,em.tipo,em.data,today)){ setMarcarEm(null); return } // terminou com o modal aberto
     const {error} = await supabase.from('cantina_marcacoes').upsert({funcionario_id:marcarFunc.id,ementa_id:em.id,prato_num:n},{onConflict:'funcionario_id,ementa_id'})
     if(error){ setMarcarErro('Não foi possível gravar a marcação. Tenta novamente.'); return }
     loadContadores(ementaAtual)
@@ -357,7 +359,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
     }
     window.addEventListener('keydown',h)
     return () => window.removeEventListener('keydown',h)
-  }, [showMarcar, marcarFunc, marcarNum])
+  }, [showMarcar, marcarFunc, marcarNum, today])
 
   const process = useCallback(async (val,isRfid=false) => {
     const v = val.replace(/[^\x21-\x7E]/g,'').trim(); if(!v) return
@@ -369,7 +371,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
       ? funcionarios.find(f=>f.rfid===v)
       : funcionarios.find(f=>f.numero===v||f.numero===v.padStart(3,'0'))
     if(!func){setStatus({type:'error',msg:'Funcionário não encontrado'});setTimeout(reset,3000);return}
-    const ementa = ementas.find(e=>e.data===TODAY&&e.tipo===currentMeal)
+    const ementa = ementas.find(e=>e.data===hoje()&&e.tipo===currentMeal)   // data em tempo real, como a refeição: o consumo nunca fica na ementa de ontem
     if(!ementa){setStatus({type:'error',msg:'Sem ementa para este momento'});setTimeout(reset,3000);return}
     const{data:exC}=await supabase.from('cantina_consumos').select('prato_num,validado_em').eq('funcionario_id',func.id).eq('ementa_id',ementa.id).maybeSingle()
     if(exC){const pk=`prato${exC.prato_num}`;setStatus({type:'dup',func,pratoNum:exC.prato_num,pratoLabel:ementa[pk+'_label'],pratoDesc:ementa[pk+'_desc'],validadoEm:exC.validado_em});setTimeout(reset,parseInt(s.validacao_tempo_dup)*1000);return}
@@ -396,7 +398,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
   },[status,process,showMarcar,showDesmarcar])
 
   const next = getNextMeal(s)
-  const marcarFechado = refeicaoTerminou(s,'A',TODAY,TODAY) && refeicaoTerminou(s,'J',TODAY,TODAY)
+  const marcarFechado = refeicaoTerminou(s,'A',today,today) && refeicaoTerminou(s,'J',today,today)
 
   // ── Modo manual: mesmo invólucro do login dos terminais (Parte 1) ──
   if (manualMode && !status) {
@@ -947,11 +949,11 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
                       : desmarcarMarcs.length===0
                       ? <div style={{padding:24,textAlign:'center',color:C.textMuted,fontSize:13}}>Sem marcações por cancelar</div>
                       : desmarcarMarcs.map(m => {
-                        const fechada = refeicaoTerminou(s,m.tipo,m.data,TODAY)
+                        const fechada = refeicaoTerminou(s,m.tipo,m.data,today)
                         return (
                         <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12}}>
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{m.tipo==='A'?'Almoço':'Jantar'} · {m.data===TODAY?'Hoje':fmtS(m.data)}</div>
+                            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{m.tipo==='A'?'Almoço':'Jantar'} · {m.data===today?'Hoje':fmtS(m.data)}</div>
                             <div style={{fontSize:12,color:C.textMuted,marginTop:2}}>{m.pratoLabel}</div>
                             {fechada && <div style={{fontSize:12,fontWeight:600,color:C.textSub,marginTop:2}}>Terminou às {fimRefeicao(s,m.tipo)}</div>}
                           </div>
@@ -1021,7 +1023,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,reload
                     : !marcarEm
                     ? <div style={{display:'flex',gap:10}}>
                         {marcarRefs.map(em => {
-                          const fechada = refeicaoTerminou(s,em.tipo,em.data,TODAY)
+                          const fechada = refeicaoTerminou(s,em.tipo,em.data,today)
                           return (
                           <button key={em.id} onClick={()=>setMarcarEm(em)} disabled={fechada}
                             style={{flex:1,minHeight:64,background:C.surface2,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:16,fontWeight:700,cursor:fechada?'not-allowed':'pointer',opacity:fechada?0.45:1}}>

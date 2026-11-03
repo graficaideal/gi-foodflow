@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchFuncionarios, fetchEmentas, fetchMarcacoesAll, fetchConsumos, fetchDefinicoes, fetchVisitantes } from './lib/queries'
 import { DEFAULTS } from './constants/settings'
 import { C } from './constants/colors'
+import useHoje from './hooks/useHoje'
 import LoadingScreen from './components/LoadingScreen'
 import Icon from './components/Icon'
 import ModeSelector from './screens/ModeSelector'
@@ -45,6 +46,15 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
+  // Novo dia com a app aberta: traz ementas publicadas entretanto. Sem rede fetchEmentas devolve [] (máquina a acordar): mantém as que há.
+  const today = useHoje()
+  const diaCarregado = useRef(today)
+  useEffect(() => {
+    if (today===diaCarregado.current) return
+    diaCarregado.current = today
+    fetchEmentas().then(e => { if (e.length) setEmentas(e) })
+  }, [today])
+
   if (loading) return <LoadingScreen msg="A ligar ao servidor…"/>
 
   const ErrBar = () => loadErr ? (
@@ -58,8 +68,8 @@ export default function App() {
   const shared = {funcionarios,ementas,settings}
 
   if (mode==='selector')   return <ModeSelector onSelect={setMode}/>
-  if (mode==='marcacoes')  return <><ErrBar/><TerminalMarcacoes  {...shared} reload={reload} onBack={()=>setMode('selector')}/></>
-  if (mode==='validacoes') return <><ErrBar/><TerminalValidacoes {...shared} reload={reload} onBack={()=>setMode('selector')}/></>
+  if (mode==='marcacoes')  return <><ErrBar/><TerminalMarcacoes  {...shared} today={today} reload={reload} onBack={()=>setMode('selector')}/></>
+  if (mode==='validacoes') return <><ErrBar/><TerminalValidacoes {...shared} today={today} reload={reload} onBack={()=>setMode('selector')}/></>
   if (mode==='backoffice' && !boOk) return <BackofficePin pin={settings.backoffice_pin} onBack={()=>setMode('selector')}
     onOk={()=>setBoOk(true)}/>
   if (mode==='backoffice') return <><ErrBar/><Backoffice {...shared} marcacoesAll={marcacoesAll} consumos={consumos} visitantes={visitantes} reload={reload} onBack={()=>{ setBoOk(false); setMode('selector') }}/></>
