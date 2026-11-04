@@ -63,7 +63,7 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     total: funcQtd() + visQtd(),
     a: funcQtd('A') + visQtd('A'),
     j: funcQtd('J') + visQtd('J'),
-    funcionarios: funcQtd(),
+    funcionarios: new Set(filtered.map(c => c.funcionario_id)).size,
     visitantes: visQtd(),
     naoConsumidos: filtered.filter(c => c.automatico).length,
   }
