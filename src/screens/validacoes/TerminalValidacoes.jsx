@@ -160,7 +160,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,today,
     if(!visitorPrato || !ementaAtual) return
     const qtd = visitorQtd
     const {data,error} = await insertVisitantes(ementaAtual.id, visitorPrato, qtd)
-    if(error) return
+    if(error){console.error('confirmarVisitantes:',error);setStatus({type:'error',msg:`Erro ao registar: ${error.message}`});setTimeout(reset,6000);return}
     const pk=`prato${visitorPrato}`,pratoLabel=ementaAtual[pk+'_label'],pratoDesc=ementaAtual[pk+'_desc']
     setRecentes(p=>[{id:`v-${data.id}`,validado_em:data.registado_em||new Date().toISOString(),nome:'Visitante(s)',foto:null,quantidade:qtd,isVisitante:true,pratoNum:visitorPrato,pratoLabel,pratoDesc},...p].slice(0,parseInt(s.validacao_sidebar_num)||10))
     cancelVisitorMode()
