@@ -4,16 +4,21 @@ import { monthRange, fmtS } from '../../utils/date'
 import { matchFunc } from '../../utils/text'
 import Avatar from '../../components/Avatar'
 import PratoTag from '../../components/PratoTag'
+import Icon from '../../components/Icon'
 import KpiLine from '../../components/KpiLine'
 import { PeriodFilter, SearchInput, pill } from '../../components/Filters'
+import { agruparPorFuncionario } from '../../utils/consumosExport'
 
 const TH   = {fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.1em'}
+const COLS = '120px 110px 120px 1fr'   // registos dentro de um grupo, como nos consumos
 
 export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
   const [[fStart, fEnd], setPeriod] = useState(() => monthRange(0))
   const [fMeal,  setFMeal]  = useState('')
   const [q,      setQ]      = useState('')
   const [view,   setView]   = useState('funcionario')
+  const [abertos,setAbertos]= useState([])   // chaves dos grupos expandidos
+  const alternar = key => setAbertos(a => a.includes(key) ? a.filter(k => k !== key) : [...a, key])
 
   const enriched = marcacoes.map(m => {
     const fn = funcionarios.find(f => f.id === m.funcionario_id)
@@ -29,8 +34,12 @@ export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
     (!fMeal  || m.tipo === fMeal) &&
     matchFunc(q, m)
   )
-  const stats   = {total:filtered.length, a:filtered.filter(m=>m.tipo==='A').length, j:filtered.filter(m=>m.tipo==='J').length}
-  const byFunc  = [...filtered].sort((a, b) => a.nome.localeCompare(b.nome, 'pt') || (a.data < b.data ? -1 : 1))
+  const stats   = {total:filtered.length, a:filtered.filter(m=>m.tipo==='A').length, j:filtered.filter(m=>m.tipo==='J').length,
+                   funcionarios:new Set(filtered.map(m => m.funcionario_id)).size}
+  // Um grupo por funcionário (por Nº, como nos consumos); dentro, por data e almoço antes de jantar
+  const grupos  = agruparPorFuncionario([...filtered]
+    .sort((a, b) => a.data < b.data ? -1 : a.data > b.data ? 1 : a.tipo.localeCompare(b.tipo))
+    .map(m => ({...m, key:m.id, quantidade:1})))
   const byDate  = tipo => [...filtered].filter(m => m.tipo === tipo).sort((a, b) => a.data < b.data ? -1 : a.data > b.data ? 1 : a.nome.localeCompare(b.nome, 'pt'))
 
   return (
@@ -40,7 +49,7 @@ export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
       <div style={{padding:'14px 32px',display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:'10px 24px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
 
         {/* Stats */}
-        <KpiLine items={[{value:stats.total,label:'marcações'},{value:stats.a,label:'almoços'},{value:stats.j,label:'jantares'}]}/>
+        <KpiLine items={[{value:stats.total,label:'marcações'},{value:stats.a,label:'almoços'},{value:stats.j,label:'jantares'},{value:stats.funcionarios,label:'funcionários'}]}/>
 
         {/* Filters + view toggle */}
         <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:6}}>
@@ -75,29 +84,38 @@ export default function SecMarcacoes({marcacoes, funcionarios, ementas}) {
         {/* View: Por funcionário */}
         {view === 'funcionario' && (
           <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,overflow:'hidden'}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 120px 72px 105px 1fr',padding:'10px 18px',gap:14,background:C.surface2,borderBottom:`1px solid ${C.border}`,alignItems:'center'}}>
-              {['Funcionário','Data','Ref.','Prato','Descrição'].map(h => <div key={h} style={TH}>{h}</div>)}
+            <div style={{display:'flex',justifyContent:'space-between',padding:'10px 18px',gap:14,background:C.surface2,borderBottom:`1px solid ${C.border}`}}>
+              {['Funcionário','Total'].map(h => <div key={h} style={TH}>{h}</div>)}
             </div>
-            {byFunc.length === 0
+            {grupos.length === 0
               ? <div style={{padding:'44px 0',textAlign:'center',color:C.textMuted,fontSize:13,fontStyle:'italic'}}>Sem marcações para os filtros aplicados.</div>
-              : byFunc.map((m, i) => (
-                <div key={i}
-                  onMouseEnter={e => e.currentTarget.style.background = C.surface2}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  style={{display:'grid',gridTemplateColumns:'1fr 120px 72px 105px 1fr',padding:'10px 18px',gap:14,borderTop:`1px solid ${C.border}`,alignItems:'center',transition:'background 0.1s'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10}}>
-                    <Avatar nome={m.nome} foto={m.foto} size={28}/>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:600,color:C.text}}>{m.nome}</div>
-                      <div style={{fontSize:11,color:C.textMuted}}>Nº {m.numero}</div>
-                    </div>
+              : grupos.map((g, i) => {
+                const aberto = abertos.includes(g.key)
+                return (
+                  <div key={g.key} style={{borderTop:i ? `1px solid ${C.border}` : 'none'}}>
+                    <button onClick={() => alternar(g.key)} aria-expanded={aberto}
+                      onMouseEnter={e => e.currentTarget.style.background = C.surface2}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 18px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left',transition:'background 0.1s'}}>
+                      <span style={{display:'flex',flexShrink:0,transform:aberto?'rotate(90deg)':'none',transition:'transform 0.15s'}}><Icon name="chev-r" size={16} color={C.textMuted}/></span>
+                      <Avatar nome={g.nome} foto={g.foto} size={30}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:600,color:C.text}}>{g.nome}</div>
+                        <div style={{fontSize:11,color:C.textMuted}}>Nº {g.numero}</div>
+                      </div>
+                      <div style={{fontSize:13,fontWeight:700,flexShrink:0,color:C.yellow}}>{g.total} {g.total === 1 ? 'marcação' : 'marcações'}</div>
+                    </button>
+                    {aberto && g.itens.map(m => (
+                      <div key={m.key} style={{display:'grid',gridTemplateColumns:COLS,padding:'8px 18px 8px 44px',gap:14,borderTop:`1px solid ${C.border}`,alignItems:'center',background:C.bg}}>
+                        <div style={{fontSize:12,color:C.textSub}}>{fmtS(m.data)}</div>
+                        <div style={{fontSize:13,color:C.textSub}}>{m.tipo === 'A' ? '🌞 Almoço' : '🌙 Jantar'}</div>
+                        <PratoTag slot={m.prato_num} label={m.pratoLabel}/>
+                        <div style={{fontSize:12,color:C.textSub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.pratoDesc}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{fontSize:12,color:C.textSub}}>{fmtS(m.data)}</div>
-                  <div style={{fontSize:13}}>{m.tipo === 'A' ? '🌞' : '🌙'}</div>
-                  <PratoTag slot={m.prato_num} label={m.pratoLabel}/>
-                  <div style={{fontSize:12,color:C.textSub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.pratoDesc}</div>
-                </div>
-              ))
+                )
+              })
             }
           </div>
         )}
