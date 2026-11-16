@@ -1,26 +1,31 @@
-export const HEADERS = ['Nº', 'Nome', 'Almoços', 'Jantares', 'Total']
+import { valorDe, eur } from './precos.js'
+
+export const HEADERS = ['Nº', 'Nome', 'Almoços', 'Jantares', 'Total', 'Valor (€)']
+const VALOR = 5   // coluna do valor: número, ou '' sem preços definidos
 const NUM = 2   // colunas a partir desta são numéricas
 
 const dmy = s => s.split('-').reverse().join('/')
 const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-// Agrupa as linhas visíveis (já filtradas) por funcionário: almoços, jantares e total.
+// Agrupa as linhas visíveis (já filtradas) por funcionário: almoços, jantares, total e valor (preço do dia de cada refeição).
 // Visitantes numa linha própria e TOTAL no fim (sempre a última linha).
-export const exportRows = sorted => {
-  const by = new Map(), vis = {a:0, j:0}
+export const exportRows = (sorted, precos = []) => {
+  const by = new Map(), vis = {a:0, j:0, itens:[]}
   for (const c of sorted) {
     const k = c.tipo === 'A' ? 'a' : 'j'
-    if (!c.nome) { vis[k] += c.quantidade; continue }
-    const g = by.get(c.numero) || {numero:c.numero, nome:c.nome, a:0, j:0}
+    if (!c.nome) { vis[k] += c.quantidade; vis.itens.push(c); continue }
+    const g = by.get(c.numero) || {numero:c.numero, nome:c.nome, a:0, j:0, itens:[]}
     g[k] += c.quantidade
+    g.itens.push(c)
     by.set(c.numero, g)
   }
+  const valor = itens => precos.length ? valorDe(precos, itens).valor : ''
   const rows = [...by.values()]
     .sort((x, y) => String(x.numero).localeCompare(String(y.numero), undefined, {numeric:true}))
-    .map(g => [g.numero, g.nome, g.a, g.j, g.a + g.j])
-  if (vis.a + vis.j) rows.push(['', 'Visitantes', vis.a, vis.j, vis.a + vis.j])
+    .map(g => [g.numero, g.nome, g.a, g.j, g.a + g.j, valor(g.itens)])
+  if (vis.a + vis.j) rows.push(['', 'Visitantes', vis.a, vis.j, vis.a + vis.j, valor(vis.itens)])
   const sum = i => rows.reduce((s, r) => s + r[i], 0)
-  rows.push(['', 'TOTAL', sum(2), sum(3), sum(4)])
+  rows.push(['', 'TOTAL', sum(2), sum(3), sum(4), valor(sorted)])
   return rows
 }
 
@@ -43,6 +48,7 @@ export const exportSummary = ({fStart, fEnd, fMeal, fEstado, q, stats}) => [
   `Período: ${fStart ? dmy(fStart) : '…'} a ${fEnd ? dmy(fEnd) : '…'}`,
   `Refeição: ${fMeal === 'A' ? 'Almoço' : fMeal === 'J' ? 'Jantar' : 'Todas'} · Estado: ${fEstado === 'C' ? 'Consumidos' : fEstado === 'N' ? 'Não consumidos' : 'Todos'}${q?.trim() ? ` · Pesquisa: "${q.trim()}"` : ''}`,
   `${stats.total} consumos · ${stats.a} almoços · ${stats.j} jantares · ${stats.funcionarios} funcionários · ${stats.visitantes} visitantes`,
+  ...(stats.valor === undefined ? [] : [`Valor a faturar: ${eur(stats.valor)}${stats.semPreco ? ` (${stats.semPreco} refeições sem preço definido não incluídas)` : ''}`]),
 ]
 
 export const printHtml = (rows, summary) => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Consumos</title><style>
@@ -61,6 +67,6 @@ export const printHtml = (rows, summary) => `<!DOCTYPE html><html><head><meta ch
   ${summary.map(s => `<div class="meta">${esc(s)}</div>`).join('')}
   <table>
     <thead><tr>${HEADERS.map((h, i) => `<th${i >= NUM ? ' class="n"' : ''}>${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map((r, ri) => `<tr${ri === rows.length - 1 ? ' class="total"' : ''}>${r.map((v, i) => `<td${i >= NUM ? ' class="n"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>
+    <tbody>${rows.map((r, ri) => `<tr${ri === rows.length - 1 ? ' class="total"' : ''}>${r.map((v, i) => `<td${i >= NUM ? ' class="n"' : ''}>${esc(i === VALOR && v !== '' ? eur(v) : v)}</td>`).join('')}</tr>`).join('')}</tbody>
   </table>
 </body></html>`

@@ -53,7 +53,15 @@ test('periodoMes: mês atual até hoje e mesmo período do mês anterior, cortad
 test('faturacao: pela data da ementa, separa validadas, não consumidas e visitantes', () => {
   const cons = [{ ementa_id: 1 }, { ementa_id: 5, automatico: true }, { ementa_id: 6 }, { ementa_id: 99 }]
   assert.deepEqual(faturacao(cons, [{ ementa_id: 1, quantidade: 2 }, { ementa_id: 6, quantidade: 5 }], ementas, ['2026-11-01', HOJE]),
-    { validadas: 1, naoConsumidas: 1, visitantes: 2, total: 4 })
+    { validadas: 1, naoConsumidas: 1, visitantes: 2, total: 4, valor: 0, semPreco: 4 })
+})
+
+test('faturacao: valor ao preço de cada dia, não consumidas e visitantes incluídos', () => {
+  const cons = [{ ementa_id: 1 }, { ementa_id: 5, automatico: true }]
+  const precos = [{ desde: '2026-11-01', valor: '5.00' }, { desde: '2026-11-15', valor: '6.00' }]
+  const r = faturacao(cons, [{ ementa_id: 1, quantidade: 2 }], ementas, ['2026-11-01', HOJE], precos)
+  assert.equal(r.valor, 23)      // dia 10: 1 × 5,00 · dia 16: (1 + 2 visitantes) × 6,00
+  assert.equal(r.semPreco, 0)
 })
 
 test('variacao: percentagem inteira, null sem base', () => {

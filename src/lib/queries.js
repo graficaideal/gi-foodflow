@@ -17,6 +17,9 @@ export const fetchFuncionarios  = async () => { const {data}=await supabase.from
 export const fetchEmentas       = async (desde) => todasAsLinhas(() => { let q=supabase.from('cantina_ementas').select('*'); if(desde) q=q.gte('data',desde); return q.order('data').order('tipo').order('id') }).catch(() => [])
 export const fetchMarcacoesAll  = () => todasAsLinhas(() => supabase.from('cantina_marcacoes').select('*').order('created_at').order('id'))
 export const fetchConsumos      = () => todasAsLinhas(() => supabase.from('cantina_consumos').select('*').order('validado_em',{ascending:false}).order('id'))
+export const fetchPrecos        = async () => { const {data,error}=await supabase.from('cantina_precos').select('id,desde,valor').order('desde',{ascending:false}); if(error) throw error; return data }
+export const savePreco          = (desde, valor) => supabase.from('cantina_precos').upsert({desde, valor}, {onConflict:'desde'})
+export const deletePreco        = id => supabase.from('cantina_precos').delete().eq('id', id)
 export const fetchDefinicoes    = async (chaves) => {
   let q=supabase.from('cantina_definicoes').select('*'); if(chaves) q=q.in('chave',chaves)
   const {data}=await q

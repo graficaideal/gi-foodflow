@@ -10,7 +10,7 @@ import SecConsumos from './SecConsumos'
 import SecMarcacoes from './SecMarcacoes'
 import SecDefinicoes from './SecDefinicoes'
 
-export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,visitantes,settings,reload,onBack}) {
+export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,visitantes,precos,settings,reload,onBack}) {
   const [sec,setSec] = useState('dashboard')
   const [importing,setImporting] = useState(false)
   const fileRef = useRef(null)
@@ -86,11 +86,11 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
         {sec==='ementas'
           ? <SecEmentas ementas={ementas} reload={reload} marcacoesAll={marcacoesAll} settings={settings}/>
           : <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-              {sec==='dashboard' && <SecDashboard funcionarios={funcionarios} ementas={ementas} marcacoes={marcacoesAll} consumos={consumos} visitantes={visitantes} settings={settings} reload={reload} onNavigate={setSec}/>}
+              {sec==='dashboard' && <SecDashboard funcionarios={funcionarios} ementas={ementas} marcacoes={marcacoesAll} consumos={consumos} visitantes={visitantes} precos={precos} settings={settings} reload={reload} onNavigate={setSec}/>}
               {sec==='funcs'     && <SecFuncionarios funcionarios={funcionarios} reload={reload}/>}
-              {sec==='consumos'  && <SecConsumos consumos={consumos} visitantes={visitantes} funcionarios={funcionarios} ementas={ementas}/>}
+              {sec==='consumos'  && <SecConsumos consumos={consumos} visitantes={visitantes} funcionarios={funcionarios} ementas={ementas} precos={precos}/>}
               {sec==='marcacoes' && <SecMarcacoes marcacoes={marcacoesAll} funcionarios={funcionarios} ementas={ementas}/>}
-              {sec==='definicoes'&& <SecDefinicoes settings={settings} reload={reload}/>}
+              {sec==='definicoes'&& <SecDefinicoes settings={settings} precos={precos} reload={reload}/>}
             </div>
         }
       </div>

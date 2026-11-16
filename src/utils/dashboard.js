@@ -1,5 +1,6 @@
 import { addD, d2s } from './date.js'
 import { weekDays } from './ementaGrid.js'
+import { valorDe } from './precos.js'
 
 const dataPorEmenta = ementas => new Map(ementas.map(e => [e.id, e.data]))
 
@@ -44,17 +45,23 @@ export const periodoMes = (hoje, offset = 0) => {
   return [d2s(new Date(y, m - 1 + offset, 1)), d2s(new Date(y, m - 1 + offset, Math.min(d, ultimo)))]
 }
 
-// Refeições faturadas no período (pela data da ementa): validadas, não consumidas (fecho automático) e visitantes.
-export const faturacao = (consumos, visitantes, ementas, [de, ate]) => {
+// Refeições faturadas no período (pela data da ementa): validadas, não consumidas (fecho automático) e visitantes,
+// e o valor ao preço em vigor em cada dia (semPreco = refeições antes do primeiro preço).
+export const faturacao = (consumos, visitantes, ementas, [de, ate], precos = []) => {
   const data = dataPorEmenta(ementas)
   const dentro = id => { const d = data.get(id); return !!d && d >= de && d <= ate }
   const c = consumos.filter(x => dentro(x.ementa_id))
+  const v = visitantes.filter(x => dentro(x.ementa_id))
   const r = {
     validadas:     c.filter(x => !x.automatico).length,
     naoConsumidas: c.filter(x => x.automatico).length,
-    visitantes:    visitantes.filter(v => dentro(v.ementa_id)).reduce((s, v) => s + v.quantidade, 0),
+    visitantes:    v.reduce((s, x) => s + x.quantidade, 0),
   }
-  return { ...r, total: r.validadas + r.naoConsumidas + r.visitantes }
+  const { valor, semPreco } = valorDe(precos, [
+    ...c.map(x => ({ data: data.get(x.ementa_id), quantidade: 1 })),
+    ...v.map(x => ({ data: data.get(x.ementa_id), quantidade: x.quantidade })),
+  ])
+  return { ...r, total: r.validadas + r.naoConsumidas + r.visitantes, valor, semPreco }
 }
 
 // Variação percentual inteira; null sem base de comparação.

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabase'
-import { fetchFuncionarios, fetchEmentas, fetchMarcacoesAll, fetchConsumos, fetchDefinicoes, fetchVisitantes } from './lib/queries'
+import { fetchFuncionarios, fetchEmentas, fetchMarcacoesAll, fetchConsumos, fetchDefinicoes, fetchVisitantes, fetchPrecos } from './lib/queries'
 import { DEFAULTS } from './constants/settings'
 import { C } from './constants/colors'
 import useHoje from './hooks/useHoje'
@@ -24,6 +24,7 @@ export default function App() {
   const [marcacoesAll, setMarcacoesAll] = useState([])
   const [consumos,     setConsumos]     = useState([])
   const [visitantes,   setVisitantes]   = useState([])
+  const [precos,       setPrecos]       = useState([])
   const [settings,     setSettings]     = useState(DEFAULTS)
 
   useEffect(() => {
@@ -51,10 +52,10 @@ export default function App() {
     try {
       setLoadErr(null)
       const bo = modo === 'backoffice'
-      const [f,e,def,m,c,v] = await Promise.all([fetchFuncionarios(),fetchEmentas(),fetchDefinicoes(),
-        ...(bo ? [fetchMarcacoesAll(),fetchConsumos(),fetchVisitantes()] : [])])
+      const [f,e,def,m,c,v,p] = await Promise.all([fetchFuncionarios(),fetchEmentas(),fetchDefinicoes(),
+        ...(bo ? [fetchMarcacoesAll(),fetchConsumos(),fetchVisitantes(),fetchPrecos()] : [])])
       setFuncionarios(f); setEmentas(e); setSettings(def)
-      if (bo) { setMarcacoesAll(m); setConsumos(c); setVisitantes(v) }
+      if (bo) { setMarcacoesAll(m); setConsumos(c); setVisitantes(v); setPrecos(p) }
     } catch(_) { setLoadErr('Erro ao carregar dados.') }
   }, [modo])
 
@@ -105,5 +106,5 @@ export default function App() {
 
   if (modo==='marcacoes')  return <><ErrBar/><TerminalMarcacoes  {...shared} today={today} reload={reload}/></>
   if (modo==='validacoes') return <><ErrBar/><TerminalValidacoes {...shared} today={today} reload={reload}/></>
-  return <><ErrBar/><Backoffice {...shared} marcacoesAll={marcacoesAll} consumos={consumos} visitantes={visitantes} reload={reload} onBack={sair}/></>
+  return <><ErrBar/><Backoffice {...shared} marcacoesAll={marcacoesAll} consumos={consumos} visitantes={visitantes} precos={precos} reload={reload} onBack={sair}/></>
 }
