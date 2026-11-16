@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { parseEmentaCsv, decodeCsv } from '../../utils/ementaCsv'
 import { C } from '../../constants/colors'
 import Icon from '../../components/Icon'
+import SecDashboard from './SecDashboard'
 import SecEmentas from './SecEmentas'
 import SecFuncionarios from './SecFuncionarios'
 import SecConsumos from './SecConsumos'
@@ -10,7 +11,7 @@ import SecMarcacoes from './SecMarcacoes'
 import SecDefinicoes from './SecDefinicoes'
 
 export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,visitantes,settings,reload,onBack}) {
-  const [sec,setSec] = useState('ementas')
+  const [sec,setSec] = useState('dashboard')
   const [importing,setImporting] = useState(false)
   const fileRef = useRef(null)
 
@@ -36,6 +37,7 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
     }
   }
   const nav = [
+    {key:'dashboard', icon:'grid',     label:'Dashboard'},
     {key:'ementas',   icon:'calendar', label:'Ementas'},
     {key:'funcs',     icon:'users',    label:'Funcionários'},
     {key:'consumos',  icon:'chart',    label:'Consumos'},
@@ -84,6 +86,7 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
         {sec==='ementas'
           ? <SecEmentas ementas={ementas} reload={reload} marcacoesAll={marcacoesAll} settings={settings}/>
           : <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+              {sec==='dashboard' && <SecDashboard funcionarios={funcionarios} ementas={ementas} marcacoes={marcacoesAll} consumos={consumos} visitantes={visitantes} settings={settings} reload={reload} onNavigate={setSec}/>}
               {sec==='funcs'     && <SecFuncionarios funcionarios={funcionarios} reload={reload}/>}
               {sec==='consumos'  && <SecConsumos consumos={consumos} visitantes={visitantes} funcionarios={funcionarios} ementas={ementas}/>}
               {sec==='marcacoes' && <SecMarcacoes marcacoes={marcacoesAll} funcionarios={funcionarios} ementas={ementas}/>}
