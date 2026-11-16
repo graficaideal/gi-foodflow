@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
 import { WD, WD_FULL, MN, addD } from '../../utils/date'
-import { fmtHorario } from '../../utils/meal'
+import { fmtHorario, refeicaoTerminou } from '../../utils/meal'
 import { diasMarcaveis, marcacoesNaoConsumidas } from '../../utils/marcar'
 import { week0 } from '../../utils/ementaGrid'
 import { fetchDiasFechados, fetchMarcacoesEConsumos, verificarPin } from '../../lib/queries'
@@ -67,9 +67,9 @@ function DayChip({d, sel, isToday, past, marks, locked, onClick}) {
 }
 
 // Botão de refeição: obrigatório antes dos pratos. Selecionado = mustard + seta para os pratos.
-function MealButton({emoji, label, hour, on, pratoLabel, locked, past, onClick}) {
+function MealButton({emoji, label, hour, on, pratoLabel, locked, lockText, onClick}) {
   const st = pratoLabel ? {icon:locked?'lock':'check', text:pratoLabel, color:on?C.bg:C.success}
-    : locked ? {icon:'lock', text:past?'Dia já passou':'Fechado', color:on?C.bg:C.textSub}
+    : locked ? {icon:'lock', text:lockText, color:on?C.bg:C.textSub}
     : {icon:null, text:'Por marcar', color:on?C.bg:C.warn}
   return (
     <button onClick={onClick}
@@ -126,7 +126,7 @@ function MinhasMarcacoes({items, total, narrow, s, today, isLocked, confirmId, s
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
                 {g.items.map(({em,meal,n}) => {
                   const {fg} = pratoColors(n)
-                  const locked = isLocked(em.data)
+                  const locked = isLocked(em)
                   const conf = confirmId===em.id
                   return (
                     <div key={em.id} style={{display:'flex',alignItems:'stretch',gap:8,height:80}}>
@@ -196,7 +196,7 @@ function AvisoNaoConsumidas({items, onClose}) {
   )
 }
 
-const ERROS_SERVIDOR = { fechado:'Este dia já não aceita marcações', bloqueado_hoje:'As marcações de hoje estão bloqueadas' }
+const ERROS_SERVIDOR = { fechado:'Este dia já não aceita marcações', bloqueado_hoje:'As marcações de hoje estão bloqueadas', terminou:'Esta refeição já terminou' }
 
 export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,settings,today,reload,onBack}) {
   const s = {...DEFAULTS,...settings}
@@ -349,6 +349,8 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
   const selectDay = d => { setSelDay(d); setSelMeal(null) }
   const goWeek   = off => { const w=daysOf(off); setWeekOffset(off); selectDay(w.find(d=>d>=today) || w[0]) }
   const isLocked = d => d<today || (d===today && bloqueado)
+  // Refeição: como no /mobile, a de hoje fecha no fim do horário (depois disso o fecho automático debita a marcação)
+  const emLocked = e => isLocked(e.data) || refeicaoTerminou(s, e.tipo, e.data, today)
 
   const dayEm  = ementas.filter(e=>e.data===day)
   const getM   = eid => marcacoes.find(m=>m.funcionario_id===func.id&&m.ementa_id===eid)
@@ -380,13 +382,13 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
     setWeekOffset(off); setSelDay(em.data); setSelMeal(em.tipo); closeList()
   }
   const removeFromList = async (em,label) => { setConfirmId(null); await doCancelar(em,label,'eliminado') }
-  const locked    = isLocked(day)
   const arrow = off => ({width:60,height:100,flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:16,color:C.textSub,display:'flex',alignItems:'center',justifyContent:'center',cursor:off?'default':'pointer',opacity:off?0.3:1})
 
   // Refeição escolhida neste dia (só existe se o dia tiver ementa desse tipo)
   const em     = selMeal && dayEm.find(e=>e.tipo===selMeal)
   const meal   = em && MEALS.find(m=>m.tipo===selMeal)
   const marc   = em && getM(em.id)
+  const locked = !!em && emLocked(em)
   const pratos = em ? [1,2,3,4].map(n=>({n,label:em[`prato${n}_label`],desc:em[`prato${n}_desc`]})).filter(p=>p.label) : []
 
   return (
@@ -451,7 +453,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
                 const e=dayEm.find(e=>e.tipo===tipo); if(!e) return null
                 const m=getM(e.id)
                 return <MealButton key={tipo} emoji={emoji} label={label} hour={fmtHorario(s,tipo)} on={selMeal===tipo}
-                  pratoLabel={m && e[`prato${m.prato_num}_label`]} locked={locked} past={day<today} onClick={()=>setSelMeal(tipo)}/>
+                  pratoLabel={m && e[`prato${m.prato_num}_label`]} locked={emLocked(e)} lockText={day<today?'Dia já passou':isLocked(day)?'Fechado':'Terminou'} onClick={()=>setSelMeal(tipo)}/>
               })}
             </div>
             <div style={{padding:16,minHeight:0,display:'flex'}}>
@@ -477,7 +479,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
         )}
       </div>
 
-      {listOpen && <MinhasMarcacoes items={minhas} total={nFuturas} narrow={narrow} s={s} today={today} isLocked={isLocked}
+      {listOpen && <MinhasMarcacoes items={minhas} total={nFuturas} narrow={narrow} s={s} today={today} isLocked={emLocked}
         confirmId={confirmId} setConfirmId={setConfirmId} onRemove={removeFromList} onOpen={openFromList} onClose={closeList}/>}
 
       {naoConsumidas.length>0 && <AvisoNaoConsumidas items={naoConsumidas} onClose={fecharAviso}/>}
