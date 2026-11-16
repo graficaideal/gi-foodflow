@@ -159,14 +159,16 @@ begin
    where e.data > public.hoje_lisboa() and extract(isodow from e.data) <= 5
      and not exists (select 1 from public.cantina_dias_fechados f where f.data = e.data) order by e.data limit 1;
   delete from public.cantina_marcacoes where funcionario_id = v_func;
-  insert into public.cantina_definicoes (chave, valor) values ('bloquear_dia_proprio', 'false')
+  -- '"…"' serve para valor text ou jsonb (_cantina_def tira as aspas)
+  insert into public.cantina_definicoes (chave, valor)
+  values ('bloquear_dia_proprio', 'false'), ('almoco_fim', '"23:59:59"'), ('jantar_fim', '"23:59:59"')
     on conflict (chave) do update set valor = excluded.valor;
   if v_ementa_antiga is not null then
     insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa_antiga, 1);
   end if;
 
   perform set_config('request.jwt.claims', c_marc, true); perform set_config('role', 'authenticated', true);
-  -- hoje, a qualquer hora, com o bloqueio desligado: aceita
+  -- hoje, antes do fim da refeição, com o bloqueio desligado: aceita
   insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa, 1)
     on conflict (funcionario_id, ementa_id) do update set prato_num = 2;
   delete from public.cantina_marcacoes where funcionario_id = v_func and ementa_id = v_ementa;
@@ -186,6 +188,16 @@ begin
     exception when raise_exception then if sqlerrm <> 'fechado' then raise; end if;
     end;
   end if;
+
+  -- hoje, depois do fim da refeição: recusa (como no /mobile)
+  reset role;
+  update public.cantina_definicoes set valor = '"00:00"' where chave in ('almoco_fim', 'jantar_fim');
+  perform set_config('role', 'authenticated', true);
+  begin
+    insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa, 1);
+    raise exception 'FALHOU: o terminal de marcações marcou uma refeição de hoje já terminada (correu o marcacoes_terminal.sql novo?)';
+  exception when raise_exception then if sqlerrm <> 'terminou' then raise; end if;
+  end;
 
   reset role;
   update public.cantina_definicoes set valor = 'true' where chave = 'bloquear_dia_proprio';
