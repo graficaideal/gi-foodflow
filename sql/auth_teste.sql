@@ -10,6 +10,7 @@ declare
   v_func   public.cantina_funcionarios.id%type;
   v_cons   public.cantina_consumos.id%type;
   v_antigo public.cantina_consumos.id%type;
+  v_ementa_antiga public.cantina_ementas.id%type;
   n int;
   c_gestor constant text := '{"role":"authenticated","email":"teste-gestor","app_metadata":{"papel":"gestor"}}';
   c_marc   constant text := '{"role":"authenticated","email":"marcacoes@graficaideal.pt","app_metadata":{"papel":"marcacoes"}}';
@@ -33,6 +34,8 @@ begin
   if v_func is null then raise exception 'Nenhum funcionário ativo sem consumo hoje: não dá para testar'; end if;
   select c.id into v_antigo from public.cantina_consumos c join public.cantina_ementas e on e.id = c.ementa_id
    where e.data < public.hoje_lisboa() limit 1;
+  select e.id into v_ementa_antiga from public.cantina_ementas e where e.data < public.hoje_lisboa()
+     and not exists (select 1 from public.cantina_consumos c where c.funcionario_id = v_func and c.ementa_id = e.id) limit 1;
 
   -- 1. Gestor não regista consumos
   perform set_config('request.jwt.claims', c_gestor, true); perform set_config('role', 'authenticated', true);
@@ -61,6 +64,13 @@ begin
   if v_antigo is not null then
     delete from public.cantina_consumos where id = v_antigo; get diagnostics n = row_count;
     if n <> 0 then raise exception 'FALHOU: validações apagou um consumo de um dia anterior'; end if;
+  end if;
+  if v_ementa_antiga is not null then
+    begin
+      insert into public.cantina_consumos (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa_antiga, 1);
+      raise exception 'FALHOU: validações registou um consumo num dia anterior (correu o auth_c_consumos_hoje.sql?)';
+    exception when insufficient_privilege then null;
+    end;
   end if;
 
   -- 5. Terminais leem funcionários
