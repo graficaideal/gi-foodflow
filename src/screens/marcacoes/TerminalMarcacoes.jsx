@@ -196,6 +196,8 @@ function AvisoNaoConsumidas({items, onClose}) {
   )
 }
 
+const ERROS_SERVIDOR = { fechado:'Este dia já não aceita marcações', bloqueado_hoje:'As marcações de hoje estão bloqueadas' }
+
 export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,settings,today,reload,onBack}) {
   const s = {...DEFAULTS,...settings}
   const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'
@@ -363,8 +365,10 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
     await Promise.all([reload(), loadMarcacoes(func.id), loadFechados()]).catch(()=>{})
     setRefreshing(false)
   }
-  const doMarcar   = async (em,n,label,pratoLabel) => { if (await marcar(em,n)) flash('Erro ao guardar',true); else flash(`${label} de ${dia} · ${pratoLabel}`) }
-  const doCancelar = async (em,label,verbo='desmarcado') => { if (await cancelar(em.id)) flash('Erro ao guardar',true); else flash(`${label} de ${fmtDia(em.data)} ${verbo}`) }
+  // Recusas do servidor (sql/marcacoes_terminal.sql): o ecrã estava desatualizado; o refresh mostra o estado real
+  const falhou = e => { flash(ERROS_SERVIDOR[e.message] || 'Erro ao guardar', true); if (ERROS_SERVIDOR[e.message]) refresh() }
+  const doMarcar   = async (em,n,label,pratoLabel) => { const e=await marcar(em,n); if (e) falhou(e); else flash(`${label} de ${dia} · ${pratoLabel}`) }
+  const doCancelar = async (em,label,verbo='desmarcado') => { const e=await cancelar(em.id); if (e) falhou(e); else flash(`${label} de ${fmtDia(em.data)} ${verbo}`) }
 
   const futureIds = new Set(ementas.filter(e=>e.data>=today).map(e=>e.id))
   const nFuturas  = marcacoes.filter(m=>futureIds.has(m.ementa_id)).length

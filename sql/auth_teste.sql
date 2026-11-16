@@ -12,6 +12,8 @@ declare
   v_antigo public.cantina_consumos.id%type;
   v_ementa_antiga public.cantina_ementas.id%type;
   n int;
+  v_futura public.cantina_ementas.id%type;
+  v_futura_data date;
   v_numero text;
   j json;
   c_gestor constant text := '{"role":"authenticated","email":"teste-gestor","app_metadata":{"papel":"gestor"}}';
@@ -150,6 +152,60 @@ begin
     raise exception 'FALHOU: o anon lê as falhas do mobile';
   exception when insufficient_privilege then null;
   end;
+  reset role;
+
+  -- 9. Marcações no servidor (sql/marcacoes_terminal.sql): terminal de marcações sem dia passado, encerrado ou hoje bloqueado
+  select e.id, e.data into v_futura, v_futura_data from public.cantina_ementas e
+   where e.data > public.hoje_lisboa() and extract(isodow from e.data) <= 5
+     and not exists (select 1 from public.cantina_dias_fechados f where f.data = e.data) order by e.data limit 1;
+  delete from public.cantina_marcacoes where funcionario_id = v_func;
+  insert into public.cantina_definicoes (chave, valor) values ('bloquear_dia_proprio', 'false')
+    on conflict (chave) do update set valor = excluded.valor;
+  if v_ementa_antiga is not null then
+    insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa_antiga, 1);
+  end if;
+
+  perform set_config('request.jwt.claims', c_marc, true); perform set_config('role', 'authenticated', true);
+  -- hoje, a qualquer hora, com o bloqueio desligado: aceita
+  insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa, 1)
+    on conflict (funcionario_id, ementa_id) do update set prato_num = 2;
+  delete from public.cantina_marcacoes where funcionario_id = v_func and ementa_id = v_ementa;
+  if v_futura is not null then
+    insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_futura, 1);
+  end if;
+  if v_ementa_antiga is not null then
+    begin
+      insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa_antiga, 1)
+        on conflict (funcionario_id, ementa_id) do update set prato_num = 2;
+      raise exception 'FALHOU: o terminal de marcações alterou uma marcação de um dia passado (correu o marcacoes_terminal.sql?)';
+    exception when raise_exception then if sqlerrm <> 'fechado' then raise; end if;
+    end;
+    begin
+      delete from public.cantina_marcacoes where funcionario_id = v_func and ementa_id = v_ementa_antiga;
+      raise exception 'FALHOU: o terminal de marcações apagou uma marcação de um dia passado';
+    exception when raise_exception then if sqlerrm <> 'fechado' then raise; end if;
+    end;
+  end if;
+
+  reset role;
+  update public.cantina_definicoes set valor = 'true' where chave = 'bloquear_dia_proprio';
+  if v_futura is not null then insert into public.cantina_dias_fechados (data) values (v_futura_data); end if;
+  perform set_config('role', 'authenticated', true);
+  begin
+    insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa, 1);
+    raise exception 'FALHOU: o terminal de marcações marcou hoje com o bloqueio ligado';
+  exception when raise_exception then if sqlerrm <> 'bloqueado_hoje' then raise; end if;
+  end;
+  if v_futura is not null then
+    begin
+      delete from public.cantina_marcacoes where funcionario_id = v_func and ementa_id = v_futura;
+      raise exception 'FALHOU: o terminal de marcações desmarcou num dia encerrado';
+    exception when raise_exception then if sqlerrm <> 'fechado' then raise; end if;
+    end;
+  end if;
+  -- validações continua a marcar hoje durante a refeição, mesmo com o bloqueio ligado
+  perform set_config('request.jwt.claims', c_val, true);
+  insert into public.cantina_marcacoes (funcionario_id, ementa_id, prato_num) values (v_func, v_ementa, 1);
   reset role;
 
   -- Tudo certo. Este erro é de propósito: desfaz tudo o que o ensaio fez.
