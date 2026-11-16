@@ -57,7 +57,7 @@ export default function Backoffice({funcionarios,ementas,marcacoesAll,consumos,v
           </button>
         ))}
         <div style={{flex:1}}/>
-        <button title="Sair" onClick={onBack}
+        <button title="Terminar sessão" aria-label="Terminar sessão" onClick={onBack}
           style={{width:42,height:42,borderRadius:10,margin:'0 0 14px',display:'flex',alignItems:'center',justifyContent:'center',background:'transparent',border:'none',cursor:'pointer'}}>
           <Icon name="logout" size={18} color={C.textMuted}/>
         </button>
