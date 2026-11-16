@@ -53,7 +53,7 @@ test('periodoMes: mês atual até hoje e mesmo período do mês anterior, cortad
 test('faturacao: pela data da ementa, separa validadas, não consumidas e visitantes', () => {
   const cons = [{ ementa_id: 1 }, { ementa_id: 5, automatico: true }, { ementa_id: 6 }, { ementa_id: 99 }]
   assert.deepEqual(faturacao(cons, [{ ementa_id: 1, quantidade: 2 }, { ementa_id: 6, quantidade: 5 }], ementas, ['2026-11-01', HOJE]),
-    { validadas: 1, naoConsumidas: 1, visitantes: 2, total: 4, valor: 0, semPreco: 4 })
+    { validadas: 1, naoConsumidas: 1, visitantes: 2, total: 4, valor: 0, semPreco: 4, valores: { validadas: 0, naoConsumidas: 0, visitantes: 0 } })
 })
 
 test('faturacao: valor ao preço de cada dia, não consumidas e visitantes incluídos', () => {
@@ -62,6 +62,7 @@ test('faturacao: valor ao preço de cada dia, não consumidas e visitantes inclu
   const r = faturacao(cons, [{ ementa_id: 1, quantidade: 2 }], ementas, ['2026-11-01', HOJE], precos)
   assert.equal(r.valor, 23)      // dia 10: 1 × 5,00 · dia 16: (1 + 2 visitantes) × 6,00
   assert.equal(r.semPreco, 0)
+  assert.deepEqual(r.valores, { validadas: 6, naoConsumidas: 5, visitantes: 12 })   // por categoria, somam o total
 })
 
 test('variacao: percentagem inteira, null sem base', () => {
@@ -86,5 +87,8 @@ test('topNaoConsumidos: só automáticos do período, por total e depois por nom
     { funcionario_id: 'c', ementa_id: 6, automatico: true }, { funcionario_id: 'b', ementa_id: 2 },
   ]
   assert.deepEqual(topNaoConsumidos(cons, funcs, ementas, ['2026-11-01', HOJE]).map(x => [x.f.nome, x.total]), [['Rui', 2], ['Ana', 1], ['Zé', 1]])
-  assert.equal(topNaoConsumidos(cons, funcs, ementas, ['2026-11-01', HOJE], 1).length, 1)
+  assert.equal(topNaoConsumidos(cons, funcs, ementas, ['2026-11-01', HOJE], [], 1).length, 1)
+  const precos = [{ desde: '2026-11-01', valor: '5.00' }, { desde: '2026-11-15', valor: '6.00' }]
+  assert.deepEqual(topNaoConsumidos(cons, funcs, ementas, ['2026-11-01', HOJE], precos).map(x => [x.f.nome, x.valor]),
+    [['Rui', 11], ['Ana', 6], ['Zé', 6]])   // Rui: dia 16 a 6,00 + dia 10 a 5,00
 })
