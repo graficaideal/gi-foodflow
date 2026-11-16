@@ -12,6 +12,8 @@ declare
   v_antigo public.cantina_consumos.id%type;
   v_ementa_antiga public.cantina_ementas.id%type;
   n int;
+  v_numero text;
+  j json;
   c_gestor constant text := '{"role":"authenticated","email":"teste-gestor","app_metadata":{"papel":"gestor"}}';
   c_marc   constant text := '{"role":"authenticated","email":"marcacoes@graficaideal.pt","app_metadata":{"papel":"marcacoes"}}';
   c_val    constant text := '{"role":"authenticated","email":"validacoes@graficaideal.pt","app_metadata":{"papel":"validacoes"}}';
@@ -104,6 +106,51 @@ begin
   select count(*) into n from public.cantina_auditoria
    where operacao = 'DELETE' and registo ->> 'id' = v_cons::text and email = 'validacoes@graficaideal.pt';
   if n <> 1 then raise exception 'FALHOU: o consumo apagado não ficou na auditoria'; end if;
+
+  -- 8. Login mobile (sql/mobile_limite.sql): acesso verificado antes do PIN e travão global de 20 falhas/hora
+  delete from public.cantina_mobile_falhas;
+  update public.cantina_funcionarios
+     set acesso_mobile = false, pin_hash = extensions.crypt('1357', extensions.gen_salt('bf')),
+         tentativas_falhadas = 0, bloqueado_ate = null
+   where id = v_func returning numero::text into v_numero;
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true); perform set_config('role', 'anon', true);
+
+  j := public.mobile_login(v_numero, '0000');
+  if j ->> 'erro' is distinct from 'sem_acesso' then raise exception 'FALHOU: sem acesso mobile devia dar sem_acesso, deu %', j; end if;
+  reset role;
+  if (select tentativas_falhadas from public.cantina_funcionarios where id = v_func) <> 0
+     or exists (select 1 from public.cantina_mobile_falhas) then
+    raise exception 'FALHOU: sem acesso mobile gastou tentativas (correu o mobile_limite.sql?)';
+  end if;
+
+  update public.cantina_funcionarios set acesso_mobile = true where id = v_func;
+  perform set_config('role', 'anon', true);
+  j := public.mobile_login(v_numero, '0000');
+  if j ->> 'erro' is distinct from 'errado' then raise exception 'FALHOU: PIN errado devia dar errado, deu %', j; end if;
+  j := public.mobile_login('99999', '0000');
+  if j ->> 'erro' is distinct from 'errado' then raise exception 'FALHOU: número inexistente devia dar errado, deu %', j; end if;
+  j := public.mobile_login(v_numero, '1357');
+  if j ->> 'token' is null then raise exception 'FALHOU: PIN certo não entrou, deu %', j; end if;
+
+  reset role;
+  select count(*) into n from public.cantina_mobile_falhas;
+  if n <> 2 then raise exception 'FALHOU: deviam estar 2 falhas registadas, estão %', n; end if;
+  insert into public.cantina_mobile_falhas (numero) select 'teste' from generate_series(1, 18);
+  perform set_config('role', 'anon', true);
+  j := public.mobile_login(v_numero, '1357');
+  if j ->> 'erro' is distinct from 'suspenso' then raise exception 'FALHOU: com 20 falhas na última hora devia dar suspenso, deu %', j; end if;
+
+  reset role;
+  update public.cantina_mobile_falhas set em = now() - interval '61 minutes';
+  perform set_config('role', 'anon', true);
+  j := public.mobile_login(v_numero, '1357');
+  if j ->> 'token' is null then raise exception 'FALHOU: falhas com mais de 1 hora ainda suspendem o login, deu %', j; end if;
+  begin
+    perform 1 from public.cantina_mobile_falhas limit 1;
+    raise exception 'FALHOU: o anon lê as falhas do mobile';
+  exception when insufficient_privilege then null;
+  end;
+  reset role;
 
   -- Tudo certo. Este erro é de propósito: desfaz tudo o que o ensaio fez.
   raise exception 'OK — todos os testes passaram (nada foi gravado)';
