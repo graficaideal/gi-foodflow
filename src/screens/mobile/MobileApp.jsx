@@ -276,12 +276,13 @@ function Pratos({em, mc, locked, ocupado, onEscolher}) {
         const sel = mc?.prato_num === p.n, pc = pratoColors(p.n)
         return (
           <button key={p.n} aria-pressed={sel} disabled={locked || ocupado} onClick={() => onEscolher(p)}
-            style={{display:'flex',alignItems:'stretch',minHeight:60,padding:0,borderRadius:12,overflow:'hidden',textAlign:'left',color:C.text,
+            style={{display:'flex',alignItems:'stretch',height:80,padding:0,borderRadius:12,overflow:'hidden',textAlign:'left',color:C.text,
               background:sel ? m.bg : C.surface,border:`2px solid ${sel ? m.tone : C.border}`,opacity:locked && !sel ? 0.5 : 1,cursor:locked ? 'default' : 'pointer'}}>
             <span style={{width:6,flexShrink:0,background:pc.fg}}/>
             <span style={{flex:1,padding:'10px 12px',display:'flex',flexDirection:'column',justifyContent:'center',gap:2}}>
               <span style={{fontSize:11,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase',color:pc.fg}}>{p.label}</span>
-              <span style={{fontSize:16,lineHeight:1.3,color:sel ? C.text : C.textSub}}>{p.desc || '—'}</span>
+              {/* Altura fixa para 2 linhas; acima disso corta com reticências */}
+              <span style={{fontSize:16,lineHeight:1.3,color:sel ? C.text : C.textSub,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{p.desc || '—'}</span>
             </span>
             {sel && <span style={{display:'flex',alignItems:'center',padding:'0 14px',color:m.tone}}><Icon name={locked ? 'lock' : 'check'} size={22}/></span>}
           </button>
