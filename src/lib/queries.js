@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { DEFAULTS } from '../constants/settings'
+import { todasAsLinhas } from '../utils/paginar'
 
 const mapFunc = r => ({...r, foto:r.foto_url})
 
@@ -12,9 +13,10 @@ export const contarMovimentos = async id => {
 }
 
 export const fetchFuncionarios  = async () => { const {data}=await supabase.from('cantina_funcionarios').select('id,numero,nome,rfid,foto_url,ativo,created_at,tem_pin,pin_alterado,acesso_mobile').order('numero'); return (data||[]).map(mapFunc) }
-export const fetchEmentas       = async (desde) => { let q=supabase.from('cantina_ementas').select('*'); if(desde) q=q.gte('data',desde); const {data}=await q.order('data').order('tipo'); return data||[] }
-export const fetchMarcacoesAll  = async () => { const {data}=await supabase.from('cantina_marcacoes').select('*').order('created_at'); return data||[] }
-export const fetchConsumos      = async () => { const {data}=await supabase.from('cantina_consumos').select('*').order('validado_em',{ascending:false}); return data||[] }
+// Sem rede devolve [] (o App mantém as ementas que tem)
+export const fetchEmentas       = async (desde) => todasAsLinhas(() => { let q=supabase.from('cantina_ementas').select('*'); if(desde) q=q.gte('data',desde); return q.order('data').order('tipo').order('id') }).catch(() => [])
+export const fetchMarcacoesAll  = () => todasAsLinhas(() => supabase.from('cantina_marcacoes').select('*').order('created_at').order('id'))
+export const fetchConsumos      = () => todasAsLinhas(() => supabase.from('cantina_consumos').select('*').order('validado_em',{ascending:false}).order('id'))
 export const fetchDefinicoes    = async (chaves) => {
   let q=supabase.from('cantina_definicoes').select('*'); if(chaves) q=q.in('chave',chaves)
   const {data}=await q
@@ -42,10 +44,8 @@ export const deleteVisitante = async (id) =>
 export const deleteMarcacao = async (id) =>
   supabase.from('cantina_marcacoes').delete().eq('id', id)
 
-export const fetchVisitantes = async () => {
-  const { data } = await supabase.from('cantina_visitantes').select('*').order('registado_em', { ascending: false })
-  return data || []
-}
+export const fetchVisitantes = () =>
+  todasAsLinhas(() => supabase.from('cantina_visitantes').select('*').order('registado_em', { ascending: false }).order('id'))
 
 export const fetchConsumosPorEmenta = async (ementaId, limit) => {
   const { data:rows } = await supabase.from('cantina_consumos')
@@ -84,12 +84,14 @@ export const fetchMarcacoesEConsumos = async (funcionarioId, dataInicio, dataFim
   return { marcacoes, consumos }
 }
 
+// Sem rede devolve [] (a impressão sai vazia, como antes)
 export const fetchMarcacoesPorPeriodo = async (dataInicio, dataFim) => {
-  const { data:rows } = await supabase.from('cantina_marcacoes')
-    .select('funcionario_id,ementa_id,prato_num,cantina_ementas!inner(data,tipo)')
+  const rows = await todasAsLinhas(() => supabase.from('cantina_marcacoes')
+    .select('id,funcionario_id,ementa_id,prato_num,cantina_ementas!inner(data,tipo)')
     .gte('cantina_ementas.data', dataInicio)
     .lte('cantina_ementas.data', dataFim)
-  return (rows||[]).map(r => ({funcionario_id:r.funcionario_id, ementa_id:r.ementa_id, prato_num:r.prato_num, data:r.cantina_ementas.data, tipo:r.cantina_ementas.tipo}))
+    .order('id')).catch(() => [])
+  return rows.map(r => ({funcionario_id:r.funcionario_id, ementa_id:r.ementa_id, prato_num:r.prato_num, data:r.cantina_ementas.data, tipo:r.cantina_ementas.tipo}))
 }
 
 // ── PIN e acesso mobile (sql/acesso_mobile.sql). Erros das RPCs chegam em error.message (ex.: 'sessao_invalida').

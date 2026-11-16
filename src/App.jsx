@@ -46,13 +46,17 @@ export default function App() {
   const uid  = session?.user?.id
   const modo = MODO[session?.user?.app_metadata?.papel]
 
+  // Marcações, consumos e visitantes (tabelas que crescem) só no backoffice; os terminais consultam o que precisam no momento.
   const reload = useCallback(async () => {
     try {
       setLoadErr(null)
-      const [f,e,m,c,v,def] = await Promise.all([fetchFuncionarios(),fetchEmentas(),fetchMarcacoesAll(),fetchConsumos(),fetchVisitantes(),fetchDefinicoes()])
-      setFuncionarios(f); setEmentas(e); setMarcacoesAll(m); setConsumos(c); setVisitantes(v); setSettings(def)
+      const bo = modo === 'backoffice'
+      const [f,e,def,m,c,v] = await Promise.all([fetchFuncionarios(),fetchEmentas(),fetchDefinicoes(),
+        ...(bo ? [fetchMarcacoesAll(),fetchConsumos(),fetchVisitantes()] : [])])
+      setFuncionarios(f); setEmentas(e); setSettings(def)
+      if (bo) { setMarcacoesAll(m); setConsumos(c); setVisitantes(v) }
     } catch(_) { setLoadErr('Erro ao carregar dados.') }
-  }, [])
+  }, [modo])
 
   // Recarrega ao entrar (ou ao mudar de conta); a renovação do token não muda o uid.
   useEffect(() => {
