@@ -3,6 +3,14 @@ import { DEFAULTS } from '../constants/settings'
 
 const mapFunc = r => ({...r, foto:r.foto_url})
 
+// Marcações e consumos de um funcionário, contados no servidor no momento (os dados em memória podem estar desatualizados)
+export const contarMovimentos = async id => {
+  const conta = t => supabase.from(t).select('id', { count:'exact', head:true }).eq('funcionario_id', id)
+  const [m, c] = await Promise.all([conta('cantina_marcacoes'), conta('cantina_consumos')])
+  if (m.error || c.error) throw m.error || c.error
+  return { marcacoes:m.count, consumos:c.count }
+}
+
 export const fetchFuncionarios  = async () => { const {data}=await supabase.from('cantina_funcionarios').select('id,numero,nome,rfid,foto_url,ativo,created_at,tem_pin,pin_alterado,acesso_mobile').order('numero'); return (data||[]).map(mapFunc) }
 export const fetchEmentas       = async (desde) => { let q=supabase.from('cantina_ementas').select('*'); if(desde) q=q.gte('data',desde); const {data}=await q.order('data').order('tipo'); return data||[] }
 export const fetchMarcacoesAll  = async () => { const {data}=await supabase.from('cantina_marcacoes').select('*').order('created_at'); return data||[] }
