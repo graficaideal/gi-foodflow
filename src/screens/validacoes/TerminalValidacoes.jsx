@@ -477,7 +477,7 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,today,
           <button onClick={()=>setShowMarc(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Imprimir</button>
           <button onClick={()=>setShowMarcar(true)} disabled={marcarFechado} title={marcarFechado?'As refeições de hoje já terminaram':undefined} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:marcarFechado?'not-allowed':'pointer',opacity:marcarFechado?0.45:1}}>Marcar</button>
           <button onClick={()=>setShowDesmarcar(true)} style={{fontSize:12,fontWeight:600,color:C.textSub,background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,padding:'5px 14px',height:30,cursor:'pointer'}}>Desmarcar</button>
-          {!isKiosk && (
+          {!isKiosk && onBack && (
             <button onClick={onBack} style={{background:'none',border:'none',color:C.textMuted,fontSize:13,cursor:'pointer'}}>← Sair</button>
           )}
         </div>
