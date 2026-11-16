@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { C } from '../../constants/colors'
 import { DEFAULTS } from '../../constants/settings'
-import { saveDefinicao } from '../../lib/queries'
+import { saveDefinicao, savePreco, deletePreco } from '../../lib/queries'
+import { precoEm, eur } from '../../utils/precos'
+import { hoje, addD } from '../../utils/date'
 import Icon from '../../components/Icon'
 
 function Toggle({checked, onChange}) {
@@ -37,8 +39,91 @@ function SettingsCard({eyebrow, children}) {
 
 const iS = {height:40, padding:'0 12px', borderRadius:10, border:`1px solid ${C.border}`, fontSize:13, background:C.surface3, color:C.text, width:'100%', boxSizing:'border-box', outline:'none'}
 const lS = {fontSize:11, fontWeight:700, color:C.textMuted, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.1em'}
+const dmy = s => s.split('-').reverse().join('/')
 
-export default function SecDefinicoes({settings, reload}) {
+// Histórico de preços: guarda-se à parte do botão "Guardar definições" porque cada preço é um registo com data
+function PrecoRefeicao({precos, reload}) {
+  const [valor,  setValor]  = useState('')
+  const [desde,  setDesde]  = useState(hoje)
+  const [erro,   setErro]   = useState('')
+  const [busy,   setBusy]   = useState(false)
+  const [apagar, setApagar] = useState(null)   // id à espera de confirmação
+  const atual = precoEm(precos, hoje())
+  const n = Number(String(valor).replace(',', '.'))
+
+  const adicionar = async () => {
+    if (!(n > 0) || !desde) { setErro('Indica um valor maior que zero e a data a partir da qual vale.'); return }
+    setBusy(true); setErro('')
+    const { error } = await savePreco(desde, Math.round(n * 100) / 100)
+    if (error) setErro('Não foi possível guardar o preço. Tenta novamente.')
+    else { setValor(''); await reload() }
+    setBusy(false)
+  }
+  const remover = async id => {
+    setBusy(true)
+    const { error } = await deletePreco(id)
+    if (error) setErro('Não foi possível eliminar o preço.'); else await reload()
+    setApagar(null); setBusy(false)
+  }
+
+  return (
+    <SettingsCard eyebrow="Preço por refeição">
+      <div style={{display:'flex', alignItems:'baseline', gap:10, marginBottom:18}}>
+        {atual === null
+          ? <span style={{fontSize:14, color:C.warn, fontWeight:600}}>Sem preço em vigor hoje — os valores a faturar não são calculados.</span>
+          : <><span style={{fontSize:28, fontWeight:800, color:C.text, fontVariantNumeric:'tabular-nums'}}>{eur(atual)}</span>
+              <span style={{fontSize:13, color:C.textSub}}>por refeição, em vigor hoje</span></>}
+      </div>
+
+      <div style={{display:'grid', gridTemplateColumns:'120px 170px auto', gap:12, alignItems:'end'}}>
+        <div>
+          <label style={lS} htmlFor="preco-valor">Valor (€)</label>
+          <input id="preco-valor" type="number" min="0.01" step="0.01" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} placeholder="0,00" style={iS}/>
+        </div>
+        <div>
+          <label style={lS} htmlFor="preco-desde">Válido desde</label>
+          <input id="preco-desde" type="date" value={desde} onChange={e => setDesde(e.target.value)} style={iS}/>
+        </div>
+        <button onClick={adicionar} disabled={busy}
+          style={{height:40, padding:'0 18px', background:'transparent', border:`1.5px solid ${C.yellow}`, borderRadius:99, color:C.yellow, fontSize:13, fontWeight:700, cursor:'pointer', justifySelf:'start', opacity:busy?0.6:1}}>
+          Guardar preço
+        </button>
+      </div>
+      {erro && <div role="alert" style={{marginTop:10, fontSize:12, color:C.danger}}>{erro}</div>}
+
+      {precos.length > 0 && (
+        <div style={{marginTop:18, border:`1px solid ${C.border}`, borderRadius:10, overflow:'hidden'}}>
+          {precos.map((p, i) => {
+            const fim = i > 0 ? precos[i - 1].desde : null   // lista do mais recente para o mais antigo
+            return (
+              <div key={p.id} style={{display:'flex', alignItems:'center', gap:12, padding:'9px 14px', borderTop:i ? `1px solid ${C.border}` : 'none', fontSize:13}}>
+                <span style={{flex:1, color:C.textSub}}>
+                  {fim ? `De ${dmy(p.desde)} a ${dmy(addD(fim, -1))}` : `Desde ${dmy(p.desde)}`}
+                </span>
+                <span style={{fontWeight:700, color:C.text, fontVariantNumeric:'tabular-nums'}}>{eur(Number(p.valor))}</span>
+                {apagar === p.id
+                  ? <span style={{display:'inline-flex', gap:6}}>
+                      <button onClick={() => remover(p.id)} disabled={busy} style={{height:28, padding:'0 10px', background:C.danger, border:'none', borderRadius:99, color:'#fff', fontSize:12, fontWeight:700}}>Eliminar</button>
+                      <button onClick={() => setApagar(null)} style={{height:28, padding:'0 10px', background:'transparent', border:`1px solid ${C.border2}`, borderRadius:99, color:C.textSub, fontSize:12}}>Cancelar</button>
+                    </span>
+                  : <button onClick={() => setApagar(p.id)} aria-label={`Eliminar o preço de ${dmy(p.desde)}`} title="Eliminar"
+                      style={{width:28, height:28, background:'transparent', border:`1px solid ${C.danger}44`, borderRadius:8, color:C.danger, display:'inline-flex', alignItems:'center', justifyContent:'center'}}>
+                      <Icon name="trash" size={13}/>
+                    </button>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <div style={{marginTop:14, fontSize:12, color:C.textMuted, background:C.surface2, borderRadius:8, padding:'9px 14px', lineHeight:1.5}}>
+        Cada refeição é valorizada ao preço em vigor no dia em que foi servida, incluindo as não consumidas e as de visitantes.
+        Um preço novo não altera os meses anteriores. Para corrigir um preço, guarda-o de novo com a mesma data.
+      </div>
+    </SettingsCard>
+  )
+}
+
+export default function SecDefinicoes({settings, precos=[], reload}) {
   const [form,   setForm]   = useState({...DEFAULTS, ...settings})
   const [saving, setSaving] = useState(false)
   const [saved,  setSaved]  = useState(false)
@@ -75,6 +160,8 @@ export default function SecDefinicoes({settings, reload}) {
   return (
     <div style={{flex:1, overflow:'auto', padding:'24px 32px'}}>
       <div style={{maxWidth:620}}>
+
+        <PrecoRefeicao precos={precos} reload={reload}/>
 
         <SettingsCard eyebrow="Horário da cantina">
           <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14}}>

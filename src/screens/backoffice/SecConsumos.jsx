@@ -8,11 +8,12 @@ import Icon from '../../components/Icon'
 import KpiLine from '../../components/KpiLine'
 import { PeriodFilter, SearchInput, pill } from '../../components/Filters'
 import { HEADERS, agruparPorFuncionario, exportRows, exportSummary, printHtml } from '../../utils/consumosExport'
+import { valorDe, eur } from '../../utils/precos'
 
 const COLS = '120px 110px 120px 1fr'   // registos dentro de um grupo
 const TH   ={fontSize:11,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.1em'}
 
-export default function SecConsumos({consumos, visitantes=[], funcionarios, ementas}) {
+export default function SecConsumos({consumos, visitantes=[], funcionarios, ementas, precos=[]}) {
   const [[fStart, fEnd], setPeriod] = useState(() => monthRange(0))
   const [fMeal,  setFMeal]  = useState('')
   const [q,      setQ]      = useState('')
@@ -67,9 +68,13 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     visitantes: visQtd(),
     naoConsumidos: filtered.filter(c => c.automatico).length,
   }
+  // Valor ao preço em vigor no dia de cada refeição (Definições → Preço por refeição); sem preços, não se mostra
+  const comValor = precos.length > 0
+  if (comValor) Object.assign(stats, valorDe(precos, sorted))
+  const valorGrupo = g => comValor ? ` · ${eur(valorDe(precos, g.itens).valor)}` : ''
 
   const exportar = async formato => {
-    const rows = exportRows(sorted), summary = exportSummary({fStart,fEnd,fMeal,fEstado,q,stats})
+    const rows = exportRows(sorted, precos), summary = exportSummary({fStart,fEnd,fMeal,fEstado,q,stats})
     if (formato === 'pdf') {
       const win = window.open('', '_blank')
       if (!win) return
@@ -80,7 +85,7 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
     }
     const XLSX = await import('xlsx')   // ponytail: carregado só ao exportar (~400 KB)
     const ws = XLSX.utils.aoa_to_sheet([...summary.map(s => [s]), [], HEADERS, ...rows])
-    ws['!cols'] = [6, 30, 10, 10, 8].map(wch => ({wch}))
+    ws['!cols'] = [6, 30, 10, 10, 8, 12].map(wch => ({wch}))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Consumos')
     XLSX.writeFile(wb, `consumos_por_funcionario_${fStart||'inicio'}_${fEnd||'fim'}.xlsx`)
@@ -93,7 +98,7 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
       <div style={{padding:'14px 32px',display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:'10px 24px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
 
         {/* Stats */}
-        <KpiLine items={[{value:stats.total,label:'consumos'},{value:stats.a,label:'almoços'},{value:stats.j,label:'jantares'},{value:stats.funcionarios,label:'funcionários'},{value:stats.visitantes,label:'visitantes'},{value:stats.naoConsumidos,label:'não consumidos'}]}/>
+        <KpiLine items={[...(comValor ? [{value:eur(stats.valor),label:'a faturar'}] : []),{value:stats.total,label:'consumos'},{value:stats.a,label:'almoços'},{value:stats.j,label:'jantares'},{value:stats.funcionarios,label:'funcionários'},{value:stats.visitantes,label:'visitantes'},{value:stats.naoConsumidos,label:'não consumidos'}]}/>
 
         {/* Filters */}
         <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:6}}>
@@ -159,7 +164,7 @@ export default function SecConsumos({consumos, visitantes=[], funcionarios, emen
                       }
                     </div>
                     <div style={{fontSize:13,fontWeight:700,flexShrink:0}}>
-                      <span style={{color:C.yellow}}>{g.total} {g.total === 1 ? 'consumo' : 'consumos'}</span>
+                      <span style={{color:C.yellow}}>{g.total} {g.total === 1 ? 'consumo' : 'consumos'}{valorGrupo(g)}</span>
                       {g.naoConsumidos > 0 && <span style={{color:C.orange}}> · {g.naoConsumidos} {g.naoConsumidos === 1 ? 'não consumido' : 'não consumidos'}</span>}
                     </div>
                   </button>

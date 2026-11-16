@@ -6,6 +6,7 @@ import { DEFAULTS } from '../../constants/settings'
 import { pratoColors } from '../../constants/pratos'
 import { fetchDiasFechados } from '../../lib/queries'
 import { resumoHoje, proximosDias, diasSemEmenta, periodoMes, faturacao, variacao, consumosPorDia, topNaoConsumidos } from '../../utils/dashboard'
+import { eur } from '../../utils/precos'
 import useHoje from '../../hooks/useHoje'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
@@ -119,7 +120,7 @@ function ColunasConsumos({ dias }) {
   )
 }
 
-export default function SecDashboard({ funcionarios, ementas, marcacoes, consumos, visitantes, settings, reload, onNavigate }) {
+export default function SecDashboard({ funcionarios, ementas, marcacoes, consumos, visitantes, precos = [], settings, reload, onNavigate }) {
   const today = useHoje()
   const [fechados,   setFechados]   = useState([])
   const [refreshing, setRefreshing] = useState(false)
@@ -137,9 +138,10 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
   const semEmenta = diasSemEmenta(ementas, fechados, today)
   const semCartao = funcionarios.filter(f => f.ativo && !f.rfid)
   const mes      = periodoMes(today), anterior = periodoMes(today, -1)
-  const fat      = faturacao(consumos, visitantes, ementas, mes)
-  const fatAnt   = faturacao(consumos, visitantes, ementas, anterior)
-  const delta    = variacao(fat.total, fatAnt.total)
+  const fat      = faturacao(consumos, visitantes, ementas, mes, precos)
+  const fatAnt   = faturacao(consumos, visitantes, ementas, anterior, precos)
+  const comValor = precos.length > 0   // sem preço definido, o destaque é o número de refeições
+  const delta    = comValor ? variacao(fat.valor, fatAnt.valor) : variacao(fat.total, fatAnt.total)
   const porDia   = consumosPorDia(consumos, visitantes, ementas, today)
   const top      = topNaoConsumidos(consumos, funcionarios, ementas, mes)
   const nomeMes  = MN_FULL[+today.slice(5, 7) - 1]
@@ -149,6 +151,9 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
       detalhe: semEmenta.map(fmtS).join(', '), acao: 'Abrir ementas' },
     semCartao.length > 0 && { key: 'funcs', texto: `${semCartao.length} ${semCartao.length === 1 ? 'funcionário ativo sem cartão' : 'funcionários ativos sem cartão'}`,
       detalhe: semCartao.slice(0, 3).map(f => f.nome).join(', ') + (semCartao.length > 3 ? ` e mais ${semCartao.length - 3}` : ''), acao: 'Abrir funcionários' },
+    !comValor && { key: 'definicoes', texto: 'Preço por refeição não definido', detalhe: 'Os valores a faturar não são calculados.', acao: 'Abrir definições' },
+    comValor && fat.semPreco > 0 && { key: 'definicoes', texto: `${fat.semPreco} ${fat.semPreco === 1 ? 'refeição' : 'refeições'} deste mês sem preço`,
+      detalhe: 'São anteriores ao primeiro preço. Guarda um preço com uma data mais antiga.', acao: 'Abrir definições' },
   ].filter(Boolean)
 
   const btnSec = { height: 30, padding: '0 12px', background: 'transparent', border: `1px solid ${C.border2}`, borderRadius: 99, color: C.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }
@@ -212,12 +217,12 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '16px 40px', marginBottom: 28 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ ...num, fontSize: 40, fontWeight: 800, color: C.text, lineHeight: 1 }}>{fat.total}</span>
-                  <span style={{ fontSize: 14, color: C.textSub }}>refeições a faturar</span>
+                  <span style={{ ...num, fontSize: 40, fontWeight: 800, color: C.text, lineHeight: 1 }}>{comValor ? eur(fat.valor) : fat.total}</span>
+                  <span style={{ fontSize: 14, color: C.textSub }}>{comValor ? `${fat.total} refeições a faturar` : 'refeições a faturar'}</span>
                 </div>
                 <div style={{ ...sub, marginTop: 6 }}>
                   {delta === null ? `Sem registos em ${diaMes(anterior)}` : <>
-                    <strong style={{ color: C.text }}>{delta > 0 ? '▲' : delta < 0 ? '▼' : ''} {delta > 0 ? '+' : ''}{delta}%</strong> face a {diaMes(anterior)} ({fatAnt.total})
+                    <strong style={{ color: C.text }}>{delta > 0 ? '▲' : delta < 0 ? '▼' : ''} {delta > 0 ? '+' : ''}{delta}%</strong> face a {diaMes(anterior)} ({comValor ? eur(fatAnt.valor) : fatAnt.total})
                   </>}
                 </div>
               </div>
