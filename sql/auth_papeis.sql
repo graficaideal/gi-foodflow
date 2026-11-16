@@ -1,14 +1,18 @@
--- Papéis das contas. Correr DEPOIS de criar as contas dos terminais (Authentication → Add user → Auto Confirm).
--- Substituir os dois emails dos gestores. O papel entra no token no próximo login.
+-- Papéis das contas. Correr DEPOIS de criar as contas dos terminais. Seguro durante o serviço: só o código novo lê o papel.
+-- Correr um passo de cada vez no SQL Editor.
 
-update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('papel',
-  case email
-    when 'marcacoes@graficaideal.pt'  then 'marcacoes'
-    when 'validacoes@graficaideal.pt' then 'validacoes'
-    else 'gestor'
-  end)
-where email in ('marcacoes@graficaideal.pt', 'validacoes@graficaideal.pt',
-                'GESTOR1@graficaideal.pt', 'GESTOR2@graficaideal.pt');
+-- PASSO 1 — ver que contas existem (para saber os emails dos dois gestores)
+select email from auth.users order by email;
 
--- Confirmar: 4 linhas, cada uma com o papel certo
-select email, raw_app_meta_data ->> 'papel' as papel from auth.users order by 2, 1;
+-- PASSO 2 — terminais (emails já certos)
+update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"papel":"marcacoes"}'
+ where email = 'marcacoes@graficaideal.pt';
+update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"papel":"validacoes"}'
+ where email = 'validacoes@graficaideal.pt';
+
+-- PASSO 3 — gestores: trocar os dois emails abaixo pelos reais que apareceram no passo 1
+update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"papel":"gestor"}'
+ where email in ('primeiro.gestor@graficaideal.pt', 'segundo.gestor@graficaideal.pt');
+
+-- PASSO 4 — confirmar: as 4 contas com papel preenchido (as outras, se houver, ficam sem papel = sem acesso)
+select email, raw_app_meta_data ->> 'papel' as papel from auth.users order by papel nulls last, email;
