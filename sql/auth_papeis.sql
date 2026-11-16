@@ -12,7 +12,7 @@ update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::json
 
 -- PASSO 3 — gestores: trocar os dois emails abaixo pelos reais que apareceram no passo 1
 update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"papel":"gestor"}'
- where email in ('primeiro.gestor@graficaideal.pt', 'segundo.gestor@graficaideal.pt');
+ where email in ('sergiohenriques@graficaideal.pt', 'sofialacerda@graficaideal.pt');
 
 -- PASSO 4 — confirmar: as 4 contas com papel preenchido (as outras, se houver, ficam sem papel = sem acesso)
 select email, raw_app_meta_data ->> 'papel' as papel from auth.users order by papel nulls last, email;
