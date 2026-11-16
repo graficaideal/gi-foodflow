@@ -46,7 +46,7 @@ export const periodoMes = (hoje, offset = 0) => {
 }
 
 // Refeições faturadas no período (pela data da ementa): validadas, não consumidas (fecho automático) e visitantes,
-// e o valor ao preço em vigor em cada dia (semPreco = refeições antes do primeiro preço).
+// e o valor ao preço em vigor em cada dia, no total e por categoria (semPreco = refeições antes do primeiro preço).
 export const faturacao = (consumos, visitantes, ementas, [de, ate], precos = []) => {
   const data = dataPorEmenta(ementas)
   const dentro = id => { const d = data.get(id); return !!d && d >= de && d <= ate }
@@ -57,11 +57,11 @@ export const faturacao = (consumos, visitantes, ementas, [de, ate], precos = [])
     naoConsumidas: c.filter(x => x.automatico).length,
     visitantes:    v.reduce((s, x) => s + x.quantidade, 0),
   }
-  const { valor, semPreco } = valorDe(precos, [
-    ...c.map(x => ({ data: data.get(x.ementa_id), quantidade: 1 })),
-    ...v.map(x => ({ data: data.get(x.ementa_id), quantidade: x.quantidade })),
-  ])
-  return { ...r, total: r.validadas + r.naoConsumidas + r.visitantes, valor, semPreco }
+  const reg = (lista, q = () => 1) => lista.map(x => ({ data: data.get(x.ementa_id), quantidade: q(x) }))
+  const regs = { validadas: reg(c.filter(x => !x.automatico)), naoConsumidas: reg(c.filter(x => x.automatico)), visitantes: reg(v, x => x.quantidade) }
+  const { valor, semPreco } = valorDe(precos, [...regs.validadas, ...regs.naoConsumidas, ...regs.visitantes])
+  const valores = Object.fromEntries(Object.entries(regs).map(([k, rs]) => [k, valorDe(precos, rs).valor]))
+  return { ...r, total: r.validadas + r.naoConsumidas + r.visitantes, valor, semPreco, valores }
 }
 
 // Variação percentual inteira; null sem base de comparação.
@@ -81,14 +81,15 @@ export const consumosPorDia = (consumos, visitantes, ementas, hoje, dias = 28) =
   return [...por.values()].sort((a, b) => a.data < b.data ? -1 : 1)
 }
 
-// Funcionários com mais refeições marcadas e não consumidas no período; empate por nome.
-export const topNaoConsumidos = (consumos, funcionarios, ementas, [de, ate], n = 5) => {
-  const data = dataPorEmenta(ementas), conta = new Map()
+// Funcionários com mais refeições marcadas e não consumidas no período, com o valor ao preço de cada dia; empate por nome.
+export const topNaoConsumidos = (consumos, funcionarios, ementas, [de, ate], precos = [], n = 5) => {
+  const data = dataPorEmenta(ementas), dias = new Map()
   for (const c of consumos) {
     const d = data.get(c.ementa_id)
-    if (c.automatico && d && d >= de && d <= ate) conta.set(c.funcionario_id, (conta.get(c.funcionario_id) || 0) + 1)
+    if (c.automatico && d && d >= de && d <= ate) dias.set(c.funcionario_id, [...(dias.get(c.funcionario_id) || []), d])
   }
-  return [...conta].map(([id, total]) => ({ f: funcionarios.find(f => f.id === id), total }))
+  return [...dias].map(([id, ds]) => ({ f: funcionarios.find(f => f.id === id), total: ds.length,
+      valor: valorDe(precos, ds.map(d => ({ data: d, quantidade: 1 }))).valor }))
     .filter(x => x.f)
     .sort((a, b) => b.total - a.total || a.f.nome.localeCompare(b.f.nome, 'pt'))
     .slice(0, n)

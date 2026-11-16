@@ -143,7 +143,7 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
   const comValor = precos.length > 0   // sem preço definido, o destaque é o número de refeições
   const delta    = comValor ? variacao(fat.valor, fatAnt.valor) : variacao(fat.total, fatAnt.total)
   const porDia   = consumosPorDia(consumos, visitantes, ementas, today)
-  const top      = topNaoConsumidos(consumos, funcionarios, ementas, mes)
+  const top      = topNaoConsumidos(consumos, funcionarios, ementas, mes, precos)
   const nomeMes  = MN_FULL[+today.slice(5, 7) - 1]
 
   const alertas = [
@@ -226,10 +226,10 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
                   </>}
                 </div>
               </div>
-              {[['Validadas', fat.validadas], ['Não consumidas', fat.naoConsumidas], ['Visitantes', fat.visitantes]].map(([l, v]) => (
-                <div key={l}>
-                  <div style={{ ...num, fontSize: 22, fontWeight: 700, color: C.text, lineHeight: 1 }}>{v}</div>
-                  <div style={{ ...sub, marginTop: 4 }}>{l}</div>
+              {[['Validadas', 'validadas'], ['Não consumidas', 'naoConsumidas'], ['Visitantes', 'visitantes']].map(([l, k]) => (
+                <div key={k}>
+                  <div style={{ ...num, fontSize: 22, fontWeight: 700, color: C.text, lineHeight: 1 }}>{comValor ? eur(fat.valores[k]) : fat[k]}</div>
+                  <div style={{ ...sub, marginTop: 4 }}>{comValor ? <><span style={{ ...num, color: C.textSub }}>{fat[k]}</span> {l.toLowerCase()}</> : l}</div>
                 </div>
               ))}
             </div>
@@ -243,14 +243,17 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
           <Cartao flex="1 1 300px" titulo="Mais refeições não consumidas" aside={<span style={sub}>{diaMes(mes)}</span>}>
             {top.length === 0 ? <div style={{ ...linha, fontSize: 13, color: C.textSub }}><Icon name="check" size={16} color={C.success}/>Nenhuma refeição marcada ficou por consumir.</div> : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {top.map(({ f, total }, i) => (
+                {top.map(({ f, total, valor }, i) => (
                   <div key={f.id} style={{ ...linha, gap: 10, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                     <Avatar nome={f.nome} foto={f.foto || f.foto_url} size={30}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nome}</div>
                       <div style={{ fontSize: 11, color: C.textMuted }}>Nº {f.numero}</div>
                     </div>
-                    <span style={{ ...num, fontSize: 15, fontWeight: 800, color: C.text }}>{total}</span>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ ...num, fontSize: 15, fontWeight: 800, color: C.text }}>{total}</div>
+                      {comValor && <div style={{ ...num, fontSize: 11, color: C.textMuted }}>{eur(valor)}</div>}
+                    </div>
                   </div>
                 ))}
               </div>
