@@ -6,7 +6,7 @@ import { WD, WD_FULL, MN, addD } from '../../utils/date'
 import { fmtHorario } from '../../utils/meal'
 import { diasMarcaveis, marcacoesNaoConsumidas } from '../../utils/marcar'
 import { week0 } from '../../utils/ementaGrid'
-import { fetchDiasFechados, fetchMarcacoesEConsumos } from '../../lib/queries'
+import { fetchDiasFechados, fetchMarcacoesEConsumos, verificarPin } from '../../lib/queries'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
 import Logo from '../../components/Logo'
@@ -272,7 +272,7 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
 
   const loginFunc = (f, viaRfid = false) => {
     loadMarcacoes(f.id); loadFechados()
-    if(f.pin && !viaRfid){setFunc(f);setStep('pin');setNumInput('');setErr('')}
+    if(f.tem_pin && !viaRfid){setFunc(f);setStep('pin');setNumInput('');setErr('')}
     else{setFunc(f);setStep('dashboard');setNumInput('');setErr('')}
   }
 
@@ -283,9 +283,10 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
     loginFunc(f)
   }
 
-  const submitPin = () => {
-    if(pinInput===func.pin){setStep('dashboard');setPinInput('');setErr('')}
-    else{setErr('PIN incorreto');setPinInput('');setTimeout(()=>setErr(''),3000)}
+  const submitPin = async () => {
+    const r = await verificarPin(func.id, pinInput).catch(() => 'sem_rede')
+    if(r==='ok'){setStep('dashboard');setPinInput('');setErr('')}
+    else{setErr(r==='bloqueado'?'PIN bloqueado — tenta daqui a 15 min':r==='sem_rede'?'Sem ligação ao servidor':'PIN incorreto');setPinInput('');setTimeout(()=>setErr(''),3000)}
   }
 
   const logout = () => {setStep('numero');setFunc(null);setNumInput('');setPinInput('');setErr('');setSelDay(null);setSelMeal(null);setWeekOffset(0);setMarcacoes([]);setListOpen(false);setConfirmId(null)}
