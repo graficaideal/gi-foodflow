@@ -21,6 +21,7 @@ const ERROS_LOGIN = {
   errado:     'Número ou PIN incorreto.',
   bloqueado:  'Demasiadas tentativas. Tenta novamente daqui a 15 minutos.',
   sem_acesso: 'Acesso mobile não autorizado. Fala com o responsável da cantina.',
+  suspenso:   'Login mobile suspenso por excesso de tentativas. Tenta mais tarde ou usa o quiosque.',
 }
 const ERROS_MARCAR = {
   bloqueado_hoje: 'As marcações de hoje já não podem ser alteradas.',
