@@ -3,12 +3,13 @@ import { DEFAULTS } from '../constants/settings'
 
 const mapFunc = r => ({...r, foto:r.foto_url})
 
-export const fetchFuncionarios  = async () => { const {data}=await supabase.from('cantina_funcionarios').select('id,numero,nome,pin,rfid,foto_url,ativo,created_at').order('numero'); return (data||[]).map(mapFunc) }
-export const fetchEmentas       = async () => { const {data}=await supabase.from('cantina_ementas').select('*').order('data').order('tipo'); return data||[] }
+export const fetchFuncionarios  = async () => { const {data}=await supabase.from('cantina_funcionarios').select('id,numero,nome,rfid,foto_url,ativo,created_at,tem_pin,pin_alterado,acesso_mobile').order('numero'); return (data||[]).map(mapFunc) }
+export const fetchEmentas       = async (desde) => { let q=supabase.from('cantina_ementas').select('*'); if(desde) q=q.gte('data',desde); const {data}=await q.order('data').order('tipo'); return data||[] }
 export const fetchMarcacoesAll  = async () => { const {data}=await supabase.from('cantina_marcacoes').select('*').order('created_at'); return data||[] }
 export const fetchConsumos      = async () => { const {data}=await supabase.from('cantina_consumos').select('*').order('validado_em',{ascending:false}); return data||[] }
-export const fetchDefinicoes    = async () => {
-  const {data}=await supabase.from('cantina_definicoes').select('*')
+export const fetchDefinicoes    = async (chaves) => {
+  let q=supabase.from('cantina_definicoes').select('*'); if(chaves) q=q.in('chave',chaves)
+  const {data}=await q
   const s={...DEFAULTS}; for(const r of data||[]) s[r.chave]=r.valor; return s
 }
 export const saveDefinicao = async (chave,valor) =>
@@ -82,3 +83,17 @@ export const fetchMarcacoesPorPeriodo = async (dataInicio, dataFim) => {
     .lte('cantina_ementas.data', dataFim)
   return (rows||[]).map(r => ({funcionario_id:r.funcionario_id, ementa_id:r.ementa_id, prato_num:r.prato_num, data:r.cantina_ementas.data, tipo:r.cantina_ementas.tipo}))
 }
+
+// ── PIN e acesso mobile (sql/acesso_mobile.sql). Erros das RPCs chegam em error.message (ex.: 'sessao_invalida').
+const rpc = async (fn, args) => { const { data, error } = await supabase.rpc(fn, args); if (error) throw error; return data }
+
+export const verificarPin     = (funcionarioId, pin) => rpc('verificar_pin', { p_funcionario_id:String(funcionarioId), p_pin:pin })   // 'ok'|'errado'|'bloqueado'|'sem_pin'
+export const mobileLogin      = (numero, pin)        => rpc('mobile_login', { p_numero:numero, p_pin:pin })
+export const mobileAlterarPin = (token, pinHash)     => rpc('mobile_alterar_pin', { p_token:token, p_pin_hash:pinHash })
+export const mobileMarcacoes  = token                => rpc('mobile_marcacoes', { p_token:token })
+export const mobileMarcar     = (token, ementaId, n) => rpc('mobile_marcar', { p_token:token, p_ementa_id:String(ementaId), p_prato_num:n })
+export const mobileDesmarcar  = (token, ementaId)    => rpc('mobile_desmarcar', { p_token:token, p_ementa_id:String(ementaId) })
+
+// PIN inicial / reset pelo backoffice: obriga a alterar no próximo login mobile. O trigger limpa bloqueio e sessões.
+export const definirPinInicial = (id, pinHash) =>
+  supabase.from('cantina_funcionarios').update({ pin_hash:pinHash, pin_alterado:false }).eq('id', id)

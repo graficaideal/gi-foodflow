@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { refeicoesPorMarcar, diasMarcaveis, marcacoesNaoConsumidas, faltamServir } from './marcar.js'
+import { refeicoesPorMarcar, diasMarcaveis, marcacoesNaoConsumidas, faltamServir, refeicoesPorDia } from './marcar.js'
 
 const ems = [
   { id: 1, data: '2026-10-20', tipo: 'J' },
@@ -83,4 +83,13 @@ test('diasMarcaveis: seg–sex sem os dias fechados', () => {
 
 test('diasMarcaveis: semana toda fechada → vazio', () => {
   assert.deepEqual(diasMarcaveis('2026-10-21', 0, ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23']), [])
+})
+
+test('refeicoesPorDia: de hoje em diante, sem encerrados, fds conforme servir_fds, almoço primeiro', () => {
+  const em = (id, data, tipo) => ({ id, data, tipo })
+  const ementas = [em(1,'2026-11-13','A'), em(2,'2026-11-16','J'), em(3,'2026-11-16','A'), em(4,'2026-11-17','A'),
+                   em(5,'2026-11-21','A'), em(6,'2026-11-18','A'), em(7,'2026-11-16','L')]
+  const r = refeicoesPorDia(ementas, ['2026-11-18'], 'false', '2026-11-16')
+  assert.deepEqual(r.map(d => [d.data, d.refeicoes.map(e => e.id)]), [['2026-11-16',[3,2]], ['2026-11-17',[4]]])
+  assert.deepEqual(refeicoesPorDia(ementas, [], 'true', '2026-11-16').map(d => d.data), ['2026-11-16','2026-11-17','2026-11-18','2026-11-21'])
 })

@@ -2,16 +2,39 @@ import { useState } from 'react'
 import { C } from '../../constants/colors'
 import Icon from '../../components/Icon'
 import Avatar from '../../components/Avatar'
+import { pinFormatoOk } from '../../utils/pin'
 
 const EYE = {fontSize:11,fontWeight:700,color:C.textMuted,letterSpacing:'0.14em',textTransform:'uppercase',marginBottom:4}
 const iS  = {flex:1,padding:'9px 12px',borderRadius:10,border:`1px solid ${C.border}`,fontSize:13,background:C.surface3,color:C.text,boxSizing:'border-box',outline:'none',width:'100%'}
 const lS  = {fontSize:11,fontWeight:700,color:C.textMuted,display:'block',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.08em'}
 
-export default function FuncionarioEditor({form:init, onSave, onCancel}) {
+export default function FuncionarioEditor({form:init, onSave, onResetPin, onCancel}) {
   const [f,         setF]         = useState({...init})
   const [rfidState, setRfidState] = useState('idle')
   const [saving,    setSaving]    = useState(false)
+  const [erro,      setErro]      = useState('')
+  const [resetOpen, setResetOpen] = useState(false)
+  const [reset,     setReset]     = useState('')
+  const [resetErr,  setResetErr]  = useState('')
+  const [resetBusy, setResetBusy] = useState(false)
   const set = (k, v) => setF(p => ({...p, [k]: v}))
+
+  const guardar = async () => {
+    if (f.pinNovo && !pinFormatoOk(f.pinNovo)) return setErro('O PIN inicial tem de ter 4 dígitos.')
+    if (f.acesso_mobile && !f.tem_pin && !f.pinNovo) return setErro('Define um PIN inicial para ativar o acesso mobile.')
+    setErro(''); setSaving(true)
+    const err = await onSave(f)
+    setSaving(false)
+    if (err) setErro('Erro ao guardar o funcionário.')
+  }
+
+  const confirmarReset = async () => {
+    setResetBusy(true); setResetErr('')
+    const err = await onResetPin(f.id, reset)
+    setResetBusy(false)
+    if (err) return setResetErr('Erro ao guardar o PIN.')
+    setF(p => ({...p, tem_pin:true, pin_alterado:false})); setResetOpen(false); setReset('')
+  }
 
   const handleFoto = e => {
     const file = e.target.files?.[0]
@@ -89,12 +112,6 @@ export default function FuncionarioEditor({form:init, onSave, onCancel}) {
         </div>
       </div>
 
-      {/* PIN */}
-      <div style={{marginBottom:12}}>
-        <label style={lS}>PIN (vazio = sem PIN)</label>
-        <input type="password" value={f.pin} onChange={e => set('pin', e.target.value)} style={iS}/>
-      </div>
-
       {/* RFID */}
       <div style={{marginBottom:6}}>
         <label style={lS}>RFID UID</label>
@@ -120,10 +137,31 @@ export default function FuncionarioEditor({form:init, onSave, onCancel}) {
         )}
       </div>
 
-      {/* Info hint */}
-      <div style={{background:C.surface2,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',marginBottom:16,marginTop:10,fontSize:12,color:C.textMuted}}>
-        PIN em branco → o funcionário entra diretamente com o código.
+      {/* PIN (quiosque + mobile) e acesso mobile */}
+      <div style={{background:C.surface2,border:`1px solid ${C.border}`,borderRadius:10,padding:'12px 14px',marginBottom:16,marginTop:14}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+          <span style={lS}>Acesso Mobile</span>
+          <PinEstado f={f}/>
+        </div>
+        <label style={{display:'flex',alignItems:'center',gap:10,fontSize:13,cursor:'pointer',color:C.textSub,marginBottom:10}}>
+          <input type="checkbox" checked={!!f.acesso_mobile} onChange={e => set('acesso_mobile', e.target.checked)}/>
+          Permitir marcações pelo telemóvel (/mobile)
+        </label>
+        {f.tem_pin
+          ? <button onClick={() => { setReset(''); setResetErr(''); setResetOpen(true) }}
+              style={{height:32,padding:'0 14px',background:'transparent',border:`1px solid ${C.yellow}55`,borderRadius:99,fontSize:12,fontWeight:700,color:C.yellow,cursor:'pointer'}}>
+              Reset PIN
+            </button>
+          : <>
+              <label style={lS}>PIN inicial (4 dígitos{f.acesso_mobile ? '' : ', opcional'})</label>
+              <input type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} value={f.pinNovo || ''}
+                onChange={e => set('pinNovo', e.target.value.replace(/\D/g,'').slice(0,4))} style={iS}/>
+            </>}
+        <div style={{fontSize:12,color:C.textMuted,marginTop:8}}>
+          O PIN é o mesmo no terminal e no telemóvel. Sem PIN, o funcionário entra no terminal só com o número. O PIN inicial tem de ser alterado no primeiro acesso mobile.
+        </div>
       </div>
+      {erro && <div style={{fontSize:12,color:C.danger,marginBottom:12}}>{erro}</div>}
 
       {/* Active toggle */}
       <label style={{display:'flex',alignItems:'center',gap:10,fontSize:13,cursor:'pointer',marginBottom:22,color:C.textSub}}>
@@ -137,11 +175,40 @@ export default function FuncionarioEditor({form:init, onSave, onCancel}) {
           style={{height:40,padding:'0 18px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,fontSize:14,color:C.textSub,cursor:'pointer'}}>
           Cancelar
         </button>
-        <button onClick={async () => { setSaving(true); await onSave(f); setSaving(false) }} disabled={saving}
+        <button onClick={guardar} disabled={saving}
           style={{height:40,padding:'0 22px',background:C.yellow,border:'none',borderRadius:99,fontSize:14,fontWeight:700,color:C.bg,cursor:'pointer'}}>
           {saving ? 'A guardar…' : 'Guardar'}
         </button>
       </div>
+
+      {/* Reset PIN */}
+      {resetOpen && (
+        <div onClick={() => !resetBusy && setResetOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}}>
+          <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,padding:22,width:360}}>
+            <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Reset do PIN de {f.nome}</div>
+            <div style={{fontSize:13,color:C.textSub,marginBottom:14,lineHeight:1.5}}>
+              O PIN atual deixa de funcionar no terminal e no telemóvel, e as sessões mobile abertas terminam. O funcionário terá de alterar o novo PIN no próximo acesso mobile.
+            </div>
+            <label style={lS}>Novo PIN inicial (4 dígitos)</label>
+            <input type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} autoFocus value={reset}
+              onChange={e => setReset(e.target.value.replace(/\D/g,'').slice(0,4))} style={iS}/>
+            {resetErr && <div style={{fontSize:12,color:C.danger,marginTop:8}}>{resetErr}</div>}
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+              <button onClick={() => setResetOpen(false)} disabled={resetBusy}
+                style={{height:36,padding:'0 16px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:99,fontSize:13,color:C.textSub,cursor:'pointer'}}>Cancelar</button>
+              <button onClick={confirmarReset} disabled={resetBusy || !pinFormatoOk(reset)}
+                style={{height:36,padding:'0 18px',background:C.yellow,border:'none',borderRadius:99,fontSize:13,fontWeight:700,color:C.bg,cursor:'pointer',opacity:pinFormatoOk(reset)?1:0.5}}>
+                {resetBusy ? 'A guardar…' : 'Confirmar reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+export function PinEstado({f}) {
+  const [txt, cor] = !f.tem_pin ? ['Sem PIN', C.textMuted] : f.pin_alterado ? ['PIN definido', C.success] : ['PIN por alterar', C.warn]
+  return <span style={{fontSize:11,fontWeight:700,padding:'3px 9px',borderRadius:99,color:cor,border:`1px solid ${cor}44`,whiteSpace:'nowrap'}}>{txt}</span>
 }

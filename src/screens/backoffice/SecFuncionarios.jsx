@@ -3,7 +3,9 @@ import { supabase } from '../../lib/supabase'
 import { C } from '../../constants/colors'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
-import FuncionarioEditor from './FuncionarioEditor'
+import FuncionarioEditor, { PinEstado } from './FuncionarioEditor'
+import { hashPin } from '../../utils/pin'
+import { definirPinInicial } from '../../lib/queries'
 
 const EYE = {fontSize:11,fontWeight:700,color:'#64748b',letterSpacing:'0.14em',textTransform:'uppercase',marginBottom:2}
 const BIG = {fontStyle:'italic',fontSize:26,color:'#e2e8f0',lineHeight:1}
@@ -14,14 +16,24 @@ export default function SecFuncionarios({funcionarios, reload}) {
   const [deleting,     setDeleting]     = useState(null) // funcionário alvo de eliminação
   const [deleteError,  setDeleteError]  = useState('')
 
-  const blank = {id:null, numero:'', nome:'', pin:'', rfid:'', foto:null, ativo:true}
+  const blank = {id:null, numero:'', nome:'', rfid:'', foto:null, ativo:true, acesso_mobile:false, tem_pin:false, pinNovo:''}
 
+  // O PIN nunca sai do browser em texto: só o hash bcrypt.
   const save = async form => {
-    const row = {numero:form.numero, nome:form.nome, pin:form.pin, rfid:form.rfid, foto_url:form.foto, ativo:form.ativo}
-    if (form.id) await supabase.from('cantina_funcionarios').update(row).eq('id', form.id)
-    else         await supabase.from('cantina_funcionarios').insert(row)
+    const row = {numero:form.numero, nome:form.nome, rfid:form.rfid, foto_url:form.foto, ativo:form.ativo, acesso_mobile:!!form.acesso_mobile}
+    if (form.pinNovo) Object.assign(row, {pin_hash:await hashPin(form.pinNovo), pin_alterado:false})
+    const { error } = form.id
+      ? await supabase.from('cantina_funcionarios').update(row).eq('id', form.id)
+      : await supabase.from('cantina_funcionarios').insert(row)
+    if (error) return error
     await reload()
     setEditing(null)
+  }
+
+  const resetPin = async (id, pin) => {
+    const { error } = await definirPinInicial(id, await hashPin(pin))
+    if (!error) await reload()
+    return error
   }
 
   const confirmarDelete = async () => {
@@ -46,7 +58,7 @@ export default function SecFuncionarios({funcionarios, reload}) {
     String(f.numero).includes(search)
   ).sort((a, b) => parseInt(a.numero) - parseInt(b.numero))
 
-  const cols = '40px 76px 1fr 92px 170px 68px 108px'
+  const cols = '40px 76px 1fr 92px 170px 120px 108px'
 
   return (
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minHeight:0}}>
@@ -89,7 +101,7 @@ export default function SecFuncionarios({funcionarios, reload}) {
 
           {/* Header */}
           <div style={{display:'grid',gridTemplateColumns:cols,padding:'10px 18px',gap:12,background:C.surface2,borderBottom:`1px solid ${C.border}`,alignItems:'center'}}>
-            {['','ID','Nome','Estado','RFID','PIN',''].map((h,i) => (
+            {['','ID','Nome','Estado','RFID','PIN / Mobile',''].map((h,i) => (
               <div key={i} style={{fontSize:11,fontWeight:700,color:C.textMuted,textTransform:'uppercase',letterSpacing:'0.1em',textAlign:i===1?'center':'left'}}>{h}</div>
             ))}
           </div>
@@ -123,8 +135,9 @@ export default function SecFuncionarios({funcionarios, reload}) {
                   {f.rfid || <span style={{color:C.textMuted,fontStyle:'italic'}}>—</span>}
                 </div>
 
-                <div style={{fontSize:12,color:C.textMuted}}>
-                  {f.pin ? '•'.repeat(Math.min(f.pin.length, 6)) : <span style={{fontStyle:'italic',fontSize:11}}>sem PIN</span>}
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4}}>
+                  <PinEstado f={f}/>
+                  {f.acesso_mobile && <span style={{fontSize:11,fontWeight:700,color:C.yellow}}>📱 Mobile ativo</span>}
                 </div>
 
                 <div style={{display:'flex',gap:5,justifyContent:'flex-end'}}>
@@ -153,7 +166,7 @@ export default function SecFuncionarios({funcionarios, reload}) {
         <>
           <div onClick={() => setEditing(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:40}}/>
           <div style={{position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',zIndex:50,width:520,background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,padding:28,boxShadow:'0 32px 80px rgba(0,0,0,0.5)'}}>
-            <FuncionarioEditor form={editing} onSave={save} onCancel={() => setEditing(null)}/>
+            <FuncionarioEditor form={editing} onSave={save} onResetPin={resetPin} onCancel={() => setEditing(null)}/>
           </div>
         </>
       )}

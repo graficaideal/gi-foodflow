@@ -31,3 +31,15 @@ export const marcacoesNaoConsumidas = (marcacoes, consumos, fechados, vistos = [
 
 // Dias de seg–sex da semana `offset` em que a cantina abre (sem os de cantina_dias_fechados).
 export const diasMarcaveis = (today, offset, fechados) => weekDays(today, offset).filter(d => !fechados.includes(d))
+
+// Vista mobile: refeições (A/J) por dia, de hoje em diante, sem dias encerrados nem fim de semana se servir_fds = 'false'.
+export const refeicoesPorDia = (ementas, fechados, servirFds, today) => {
+  const porDia = new Map()
+  for (const e of ementas) {
+    const wd = new Date(e.data + 'T12:00:00').getDay()
+    if (e.data < today || (e.tipo !== 'A' && e.tipo !== 'J') || fechados.includes(e.data) || (servirFds === 'false' && (wd === 0 || wd === 6))) continue
+    porDia.set(e.data, [...(porDia.get(e.data) || []), e])
+  }
+  return [...porDia].sort(([a], [b]) => a.localeCompare(b))
+    .map(([data, refeicoes]) => ({ data, refeicoes: refeicoes.sort((a, b) => a.tipo.localeCompare(b.tipo)) }))
+}
