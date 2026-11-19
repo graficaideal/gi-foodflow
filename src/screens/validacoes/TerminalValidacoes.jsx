@@ -37,7 +37,7 @@ function Pessoa({func, ring, avatar=220, font=60, width=360, metaColor}) {
   )
 }
 
-export default function TerminalValidacoes({funcionarios,ementas,settings,today,reload,onBack}) {
+export default function TerminalValidacoes({funcionarios,ementas,settings,today,onBack}) {
   const s = {...DEFAULTS,...settings}
   // Botão "Amanhã" da impressão: de sexta a domingo passa a ser a segunda-feira seguinte (ver proximoDiaUtil)
   const PROX_LABEL = [5,6,0].includes(new Date(today+'T12:00:00').getDay()) ? 'Segunda-feira' : 'Amanhã'
@@ -142,7 +142,9 @@ export default function TerminalValidacoes({funcionarios,ementas,settings,today,
   useEffect(() => { loadContadores(ementaAtual) }, [ementaAtual])
   useEffect(() => { loadRecentes() }, [funcionarios, ementas, ementaAtual?.id])
 
-  const refresh = async () => { setRefreshing(true); await reload(); setRefreshing(false) }
+  // Refresh real (como fechar e abrir a app): traz funcionários novos e a versão mais recente do código.
+  // O leitor RFID volta a ligar-se sozinho ao arrancar (useSerial → getPorts).
+  const refresh = () => { setRefreshing(true); window.location.reload() }
 
   const confirmarConsumo = async (func,ementa,pratoNum) => {
     const {data,error} = await supabase.from('cantina_consumos').insert({funcionario_id:func.id,ementa_id:ementa.id,prato_num:pratoNum}).select().single()

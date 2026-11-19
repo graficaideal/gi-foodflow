@@ -105,6 +105,6 @@ export default function App() {
   const shared = {funcionarios,ementas,settings}
 
   if (modo==='marcacoes')  return <><ErrBar/><TerminalMarcacoes  {...shared} today={today} reload={reload}/></>
-  if (modo==='validacoes') return <><ErrBar/><TerminalValidacoes {...shared} today={today} reload={reload}/></>
+  if (modo==='validacoes') return <><ErrBar/><TerminalValidacoes {...shared} today={today}/></>
   return <><ErrBar/><Backoffice {...shared} marcacoesAll={marcacoesAll} consumos={consumos} visitantes={visitantes} precos={precos} reload={reload} onBack={sair}/></>
 }

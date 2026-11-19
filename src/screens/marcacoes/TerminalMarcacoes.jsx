@@ -215,7 +215,6 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
   const [listOpen,  setListOpen]  = useState(false)
   const [confirmId, setConfirmId] = useState(null)   // ementa_id em confirmação de eliminação
   const [fechados,  setFechados]  = useState([])     // datas em cantina_dias_fechados
-  const [refreshing,setRefreshing]= useState(false)
   const [naoConsumidas,setNaoConsumidas] = useState([])
   const toastTimer = useRef(null)
   const narrow = useNarrow()
@@ -316,7 +315,8 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
         {rfidMsg && <div style={{marginTop:12,padding:'8px 12px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:8,fontSize:12,color:'#fbbf24'}}>{rfidMsg}</div>}
       </div>
     )
-    return <LoginShell leftPanel={leftPanel} value={numInput} onChange={setNumInput} onConfirm={submitNumero} onBack={isKiosk?undefined:onBack} serialStatus={serialStatus} error={err} />
+    // Refresh real (como fechar e abrir a app): traz funcionários novos e a versão mais recente do código
+    return <LoginShell leftPanel={leftPanel} value={numInput} onChange={setNumInput} onConfirm={submitNumero} onBack={isKiosk?undefined:onBack} onRefresh={()=>window.location.reload()} serialStatus={serialStatus} error={err} />
   }
 
   if (step==='pin') {
@@ -362,11 +362,8 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
     toastTimer.current = setTimeout(()=>setToast(null), 2600)
   }
   const dia = day ? fmtDia(day) : ''
-  const refresh = async () => {
-    setRefreshing(true)
-    await Promise.all([reload(), loadMarcacoes(func.id), loadFechados()]).catch(()=>{})
-    setRefreshing(false)
-  }
+  // Recarrega os dados sem sair da sessão do funcionário (o refresh real fica no ecrã inicial)
+  const refresh = () => Promise.all([reload(), loadMarcacoes(func.id), loadFechados()]).catch(()=>{})
   // Recusas do servidor (sql/marcacoes_terminal.sql): o ecrã estava desatualizado; o refresh mostra o estado real
   const falhou = e => { flash(ERROS_SERVIDOR[e.message] || 'Erro ao guardar', true); if (ERROS_SERVIDOR[e.message]) refresh() }
   const doMarcar   = async (em,n,label,pratoLabel) => { const e=await marcar(em,n); if (e) falhou(e); else flash(`${label} de ${dia} · ${pratoLabel}`) }
@@ -405,9 +402,6 @@ export default function TerminalMarcacoes({funcionarios,ementas:todasEmentas,set
           </div>
         </div>
         <div style={{display:'flex',gap:10,flexShrink:0}}>
-          <button onClick={refresh} disabled={refreshing} aria-label="Atualizar" style={{width:60,height:60,flexShrink:0,background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',cursor:refreshing?'default':'pointer'}}>
-            <span style={{display:'flex',animation:refreshing?'spin 0.8s linear infinite':undefined}}><Icon name="refresh" size={24}/></span>
-          </button>
           <button onClick={()=>{setListOpen(true);setConfirmId(null)}} style={{height:60,padding:'0 22px',background:C.surface,border:`2px solid ${C.border2}`,borderRadius:14,color:C.text,fontSize:18,fontWeight:700,display:'inline-flex',alignItems:'center',gap:12,cursor:'pointer',fontFamily:'inherit'}}>
             <Icon name="list" size={22}/>{narrow?'Marcações':'As minhas marcações'}
             <span style={{minWidth:32,height:32,padding:'0 9px',borderRadius:99,background:C.yellow,color:C.bg,fontSize:16,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{nFuturas}</span>
