@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { WD, MN } from '../utils/date'
 import Logo from './Logo'
+import Icon from './Icon'
 
 export const ARR = { bg:'#151920', card:'#1a2028', surf:'#29333d', border:'#3a4550', ink:'#e8ecef', ink2:'#a4adb6', ink3:'#6c7680', accent:'#e0cb4b', accentText:'#1a2028' }
 
-export default function LoginShell({leftPanel, value, secret=false, onChange, onConfirm, onBack, serialStatus, error, belowKeypad}) {
+export default function LoginShell({leftPanel, value, secret=false, onChange, onConfirm, onBack, onRefresh, serialStatus, error, belowKeypad}) {
   const now = new Date()
   const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
   const dateStr = WD[now.getDay()] + ' ' + now.getDate() + ' ' + MN[now.getMonth()]
@@ -37,6 +38,11 @@ export default function LoginShell({leftPanel, value, secret=false, onChange, on
               <span style={{width:7,height:7,borderRadius:'50%',background:'#34d399',boxShadow:'0 0 6px #34d399'}} />
               RFID ATIVO
             </span>
+          )}
+          {onRefresh && (
+            <button onClick={onRefresh} aria-label="Atualizar" style={{width:48,height:48,background:A.card,border:`1px solid ${A.border}`,borderRadius:12,color:A.ink,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <Icon name="refresh" size={22}/>
+            </button>
           )}
         </div>
       </div>
