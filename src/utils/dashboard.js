@@ -4,7 +4,8 @@ import { valorDe } from './precos.js'
 
 const dataPorEmenta = ementas => new Map(ementas.map(e => [e.id, e.data]))
 
-// Hoje, por refeição: marcações por prato, validadas (consumo real), por servir (marcação sem consumo) e visitantes.
+// Hoje, por refeição: marcações por prato, validadas (consumo real), por servir (marcação sem consumo),
+// não consumidas (fecho automático) e visitantes.
 export const resumoHoje = (ementas, marcacoes, consumos, visitantes, hoje) => ['A', 'J'].map(tipo => {
   const em = ementas.find(e => e.data === hoje && e.tipo === tipo)
   if (!em) return { tipo, em: null }
@@ -18,6 +19,7 @@ export const resumoHoje = (ementas, marcacoes, consumos, visitantes, hoje) => ['
                   .map(n => ({ n, label: em[`prato${n}_label`], marcadas: marc.filter(m => m.prato_num === n).length })),
     validadas:  cons.filter(c => !c.automatico).length,
     porServir:  marc.filter(m => !consumiram.has(m.funcionario_id)).length,
+    naoConsumidas: cons.filter(c => c.automatico).length,
     visitantes: visitantes.filter(v => v.ementa_id === em.id).reduce((s, v) => s + v.quantidade, 0),
   }
 })

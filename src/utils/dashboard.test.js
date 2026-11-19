@@ -23,6 +23,8 @@ test('resumoHoje: marcações por prato (só pratos com nome), validadas sem aut
   assert.equal(a.marcadas, 3)
   assert.equal(a.validadas, 2)    // a e x (sem marcação); o automático não conta
   assert.equal(a.porServir, 1)    // c
+  assert.equal(a.naoConsumidas, 1) // b (fecho automático)
+  assert.equal(j.naoConsumidas, 0)
   assert.equal(a.visitantes, 3)
   assert.equal(j.marcadas, 0)
 })
