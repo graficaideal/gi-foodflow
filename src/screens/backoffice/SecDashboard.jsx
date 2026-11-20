@@ -67,8 +67,9 @@ function Refeicao({ r, settings }) {
           <span style={{ fontSize: 14, color: C.textSub }}>{r.marcadas === 1 ? 'marcada' : 'marcadas'}</span>
         </div>
         <div style={{ ...num, fontSize: 13, color: C.textSub, marginBottom: 14 }}>
-          <strong style={{ color: C.text }}>{r.validadas}</strong> validadas · <strong style={{ color: C.text }}>{r.porServir}</strong> por servir
+          <strong style={{ color: C.text }}>{r.validadas}</strong> validadas
           {r.naoConsumidas > 0 && <> · <strong style={{ color: C.text }}>{r.naoConsumidas}</strong> não consumidas</>}
+          {' · '}<strong style={{ color: C.text }}>{r.porServir}</strong> por servir
           {r.visitantes > 0 && <> · <strong style={{ color: C.text }}>{r.visitantes}</strong> visitantes</>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(80px, 120px) 1fr 32px', gap: '8px 10px', alignItems: 'center' }}>

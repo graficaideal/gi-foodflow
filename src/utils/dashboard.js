@@ -4,13 +4,14 @@ import { valorDe } from './precos.js'
 
 const dataPorEmenta = ementas => new Map(ementas.map(e => [e.id, e.data]))
 
-// Hoje, por refeição: marcações por prato, validadas (consumo real), por servir (marcação sem consumo),
-// não consumidas (fecho automático) e visitantes.
+// Hoje, por refeição, só sobre quem marcou: validadas + não consumidas (fecho automático) + por servir = marcadas.
+// Consumos sem marcação ficam fora; visitantes à parte.
 export const resumoHoje = (ementas, marcacoes, consumos, visitantes, hoje) => ['A', 'J'].map(tipo => {
   const em = ementas.find(e => e.data === hoje && e.tipo === tipo)
   if (!em) return { tipo, em: null }
   const marc = marcacoes.filter(m => m.ementa_id === em.id)
-  const cons = consumos.filter(c => c.ementa_id === em.id)
+  const marcaram = new Set(marc.map(m => m.funcionario_id))
+  const cons = consumos.filter(c => c.ementa_id === em.id && marcaram.has(c.funcionario_id))
   const consumiram = new Set(cons.map(c => c.funcionario_id))
   return {
     tipo, em,

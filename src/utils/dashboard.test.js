@@ -12,7 +12,7 @@ const ementas = [
   { id: 6, data: '2026-10-10', tipo: 'A', prato1_label: 'Carne' },
 ]
 
-test('resumoHoje: marcações por prato (só pratos com nome), validadas sem automáticos, por servir e visitantes', () => {
+test('resumoHoje: só quem marcou — validadas, não consumidas e por servir somam as marcadas; visitantes à parte', () => {
   const marc = [
     { funcionario_id: 'a', ementa_id: 1, prato_num: 1 }, { funcionario_id: 'b', ementa_id: 1, prato_num: 1 },
     { funcionario_id: 'c', ementa_id: 1, prato_num: 2 }, { funcionario_id: 'd', ementa_id: 3, prato_num: 1 },
@@ -21,12 +21,13 @@ test('resumoHoje: marcações por prato (só pratos com nome), validadas sem aut
   const [a, j] = resumoHoje(ementas, marc, cons, [{ ementa_id: 1, quantidade: 3 }], HOJE)
   assert.deepEqual(a.pratos.map(p => [p.label, p.marcadas]), [['Carne', 2], ['Peixe', 1], ['Vegetariano', 0]])
   assert.equal(a.marcadas, 3)
-  assert.equal(a.validadas, 2)    // a e x (sem marcação); o automático não conta
+  assert.equal(a.validadas, 1)    // a; x validou sem marcação e fica fora; o automático não conta
   assert.equal(a.porServir, 1)    // c
   assert.equal(a.naoConsumidas, 1) // b (fecho automático)
   assert.equal(j.naoConsumidas, 0)
   assert.equal(a.visitantes, 3)
   assert.equal(j.marcadas, 0)
+  assert.equal(a.validadas + a.naoConsumidas + a.porServir, a.marcadas)   // o resumo soma sempre as marcadas
 })
 
 test('resumoHoje: refeição sem ementa hoje devolve em null', () => {
