@@ -216,11 +216,11 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
           <Cartao flex="2 1 520px" titulo={`Faturação de ${nomeMes.toLowerCase()}`} aside={<span style={sub}>{diaMes(mes)}</span>}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '16px 40px', marginBottom: 28 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '16px 32px', marginBottom: 28 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ ...num, fontSize: 40, fontWeight: 800, color: C.text, lineHeight: 1 }}>{comValor ? eur(fat.valor) : fat.total}</span>
-                  <span style={{ fontSize: 14, color: C.textSub }}>{comValor ? `${fat.total} refeições a faturar` : 'refeições a faturar'}</span>
+                  <span style={{ ...num, fontSize: 32, fontWeight: 800, color: C.text, lineHeight: 1 }}>{comValor ? eur(fat.valor) : fat.total}</span>
+                  <span style={{ fontSize: 13, color: C.textSub }}>{comValor ? `${fat.total} refeições a faturar` : 'refeições a faturar'}</span>
                 </div>
                 <div style={{ ...sub, marginTop: 6 }}>
                   {delta === null ? `Sem registos em ${diaMes(anterior)}` : <>
