@@ -41,9 +41,14 @@ test('proximosDias: só dias depois de hoje, sem encerrados, null quando não h�
   assert.equal(proximosDias(ementas, marc, [], HOJE, 1).length, 1)
 })
 
-test('diasSemEmenta: dias úteis desta semana (de hoje) e da próxima, sem ementa e não encerrados', () => {
-  assert.deepEqual(diasSemEmenta(ementas, ['2026-11-20'], HOJE),
-    ['2026-11-19', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27'])
+test('diasSemEmenta: dias úteis desta semana (de hoje) e da próxima, por refeição em falta, sem encerrados', () => {
+  const r = diasSemEmenta(ementas, ['2026-11-20'], HOJE)
+  assert.deepEqual(r.slice(0, 3), [
+    { data: '2026-11-17', falta: ['J'] },        // só almoço
+    { data: '2026-11-18', falta: ['A'] },        // só jantar
+    { data: '2026-11-19', falta: ['A', 'J'] },
+  ])
+  assert.deepEqual(r.map(d => d.data), ['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27'])
 })
 
 test('periodoMes: mês atual até hoje e mesmo período do mês anterior, cortado no último dia', () => {
