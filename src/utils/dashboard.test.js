@@ -41,14 +41,28 @@ test('proximosDias: só dias depois de hoje, sem encerrados, null quando não h�
   assert.equal(proximosDias(ementas, marc, [], HOJE, 1).length, 1)
 })
 
-test('diasSemEmenta: dias úteis desta semana (de hoje) e da próxima, por refeição em falta, sem encerrados', () => {
-  const r = diasSemEmenta(ementas, ['2026-11-20'], HOJE)
-  assert.deepEqual(r.slice(0, 3), [
+test('diasSemEmenta: próximos 10 dias úteis sem encerrados, por refeição em falta; buracos não têm "ate"', () => {
+  const { falta, ate } = diasSemEmenta(ementas, ['2026-11-20'], HOJE)
+  assert.deepEqual(falta.slice(0, 3), [
     { data: '2026-11-17', falta: ['J'] },        // só almoço
     { data: '2026-11-18', falta: ['A'] },        // só jantar
     { data: '2026-11-19', falta: ['A', 'J'] },
   ])
-  assert.deepEqual(r.map(d => d.data), ['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27'])
+  // 20 encerrado e fim de semana saltados: a janela de 10 dias úteis chega a seg 30
+  assert.deepEqual(falta.map(d => d.data), ['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-30'])
+  assert.equal(ate, undefined)
+})
+
+test('diasSemEmenta: falta tudo seguido até ao fim → ate é a última refeição publicada', () => {
+  assert.deepEqual(diasSemEmenta(ementas.slice(0, 3), [], HOJE).ate, { data: '2026-11-17', tipo: 'A' })
+  assert.equal(diasSemEmenta([], [], HOJE).ate, null)
+  assert.equal(diasSemEmenta([], [], HOJE).falta.length, 10)
+})
+
+test('diasSemEmenta: janela toda publicada → sem falta', () => {
+  const dias = ['16', '17', '18', '19', '20', '23', '24', '25', '26', '27'].map(d => `2026-11-${d}`)
+  const r = diasSemEmenta(dias.flatMap(data => [{ data, tipo: 'A' }, { data, tipo: 'J' }]), [], HOJE)
+  assert.deepEqual(r, { falta: [], ate: undefined })
 })
 
 test('periodoMes: mês atual até hoje e mesmo período do mês anterior, cortado no último dia', () => {

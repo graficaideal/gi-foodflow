@@ -1,5 +1,4 @@
 import { addD, d2s } from './date.js'
-import { weekDays } from './ementaGrid.js'
 import { valorDe } from './precos.js'
 
 const dataPorEmenta = ementas => new Map(ementas.map(e => [e.id, e.data]))
@@ -35,13 +34,22 @@ export const proximosDias = (ementas, marcacoes, fechados, hoje, n = 5) => {
   return dias.map(d => ({ data: d, A: conta(d, 'A'), J: conta(d, 'J') }))
 }
 
-// Dias úteis desta semana (a partir de hoje) e da próxima com almoço e/ou jantar por publicar, fora os encerrados.
-export const diasSemEmenta = (ementas, fechados, hoje) => {
+// Próximos n dias úteis (a partir de hoje, sem encerrados) com almoço e/ou jantar por publicar.
+// ate: quando o que falta é tudo seguido até ao fim da janela, a última refeição publicada ({ data, tipo }) ou null
+// se nada está publicado; undefined se há buracos no meio ou se não falta nada.
+export const diasSemEmenta = (ementas, fechados, hoje, n = 10) => {
   const com = new Set(ementas.map(e => `${e.data}|${e.tipo}`))
-  return [...weekDays(hoje, 0), ...weekDays(hoje, 1)]
-    .filter(d => d >= hoje && !fechados.includes(d))
-    .map(data => ({ data, falta: ['A', 'J'].filter(t => !com.has(`${data}|${t}`)) }))
-    .filter(d => d.falta.length)
+  const dias = []
+  for (let d = hoje; dias.length < n; d = addD(d, 1)) {
+    const wd = new Date(d + 'T12:00:00').getDay()
+    if (wd > 0 && wd < 6 && !fechados.includes(d)) dias.push(d)
+  }
+  const slots = dias.flatMap(data => ['A', 'J'].map(tipo => ({ data, tipo, ok: com.has(`${data}|${tipo}`) })))
+  const k = slots.findIndex(s => !s.ok)
+  return {
+    falta: dias.map(data => ({ data, falta: ['A', 'J'].filter(t => !com.has(`${data}|${t}`)) })).filter(d => d.falta.length),
+    ate: k >= 0 && slots.slice(k).every(s => !s.ok) ? (k ? { data: slots[k - 1].data, tipo: slots[k - 1].tipo } : null) : undefined,
+  }
 }
 
 // [1.º dia do mês, mesmo dia do mês] — offset -1 = mesmo período do mês anterior (cortado no último dia desse mês).
