@@ -35,10 +35,13 @@ export const proximosDias = (ementas, marcacoes, fechados, hoje, n = 5) => {
   return dias.map(d => ({ data: d, A: conta(d, 'A'), J: conta(d, 'J') }))
 }
 
-// Dias úteis desta semana (a partir de hoje) e da próxima sem nenhuma ementa publicada, fora os encerrados.
+// Dias úteis desta semana (a partir de hoje) e da próxima com almoço e/ou jantar por publicar, fora os encerrados.
 export const diasSemEmenta = (ementas, fechados, hoje) => {
-  const com = new Set(ementas.map(e => e.data))
-  return [...weekDays(hoje, 0), ...weekDays(hoje, 1)].filter(d => d >= hoje && !fechados.includes(d) && !com.has(d))
+  const com = new Set(ementas.map(e => `${e.data}|${e.tipo}`))
+  return [...weekDays(hoje, 0), ...weekDays(hoje, 1)]
+    .filter(d => d >= hoje && !fechados.includes(d))
+    .map(data => ({ data, falta: ['A', 'J'].filter(t => !com.has(`${data}|${t}`)) }))
+    .filter(d => d.falta.length)
 }
 
 // [1.º dia do mês, mesmo dia do mês] — offset -1 = mesmo período do mês anterior (cortado no último dia desse mês).
