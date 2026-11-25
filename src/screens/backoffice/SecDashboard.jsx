@@ -138,7 +138,13 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
   const proximos = proximosDias(ementas, marcacoes, fechados, today)
   const maxProx  = Math.max(1, ...proximos.flatMap(d => [d.A || 0, d.J || 0]))
   const semEmenta = diasSemEmenta(ementas, fechados, today)
-  const nSemEmenta = semEmenta.reduce((s, d) => s + d.falta.length, 0)
+  const nSemEmenta = semEmenta.falta.reduce((s, d) => s + d.falta.length, 0)
+  const refLabel  = t => REF[t].label.toLowerCase()
+  const detalheSemEmenta =
+    semEmenta.ate === null ? 'Nenhuma ementa publicada nos próximos 10 dias úteis.'
+    : semEmenta.ate ? `Ementas publicadas até ${fmtS(semEmenta.ate.data)}${semEmenta.ate.tipo === 'A' ? ' (só almoço)' : ''}.`
+    : semEmenta.falta.slice(0, 3).map(d => `${fmtS(d.data)} ${d.falta.map(refLabel).join(' e ')}`).join(', ')
+      + (semEmenta.falta.length > 3 ? ` e mais ${semEmenta.falta.length - 3} ${semEmenta.falta.length === 4 ? 'dia' : 'dias'}` : '')
   const semCartao = funcionarios.filter(f => f.ativo && !f.rfid)
   const mes      = periodoMes(today), anterior = periodoMes(today, -1)
   const fat      = faturacao(consumos, visitantes, ementas, mes, precos)
@@ -151,7 +157,7 @@ export default function SecDashboard({ funcionarios, ementas, marcacoes, consumo
 
   const alertas = [
     nSemEmenta > 0 && { key: 'ementas', texto: `${nSemEmenta} ${nSemEmenta === 1 ? 'refeição sem ementa' : 'refeições sem ementa'}`,
-      detalhe: semEmenta.map(d => `${fmtS(d.data)} ${d.falta.map(t => REF[t].label.toLowerCase()).join(' e ')}`).join(', '), acao: 'Abrir ementas' },
+      detalhe: detalheSemEmenta, acao: 'Abrir ementas' },
     semCartao.length > 0 && { key: 'funcs', texto: `${semCartao.length} ${semCartao.length === 1 ? 'funcionário ativo sem cartão' : 'funcionários ativos sem cartão'}`,
       detalhe: semCartao.slice(0, 3).map(f => f.nome).join(', ') + (semCartao.length > 3 ? ` e mais ${semCartao.length - 3}` : ''), acao: 'Abrir funcionários' },
     !comValor && { key: 'definicoes', texto: 'Preço por refeição não definido', detalhe: 'Os valores a faturar não são calculados.', acao: 'Abrir definições' },
