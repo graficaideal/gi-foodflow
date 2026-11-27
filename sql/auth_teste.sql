@@ -109,7 +109,7 @@ begin
    where operacao = 'DELETE' and registo ->> 'id' = v_cons::text and email = 'validacoes@graficaideal.pt';
   if n <> 1 then raise exception 'FALHOU: o consumo apagado não ficou na auditoria'; end if;
 
-  -- 8. Login mobile (sql/mobile_limite.sql): acesso verificado antes do PIN e travão global de 20 falhas/hora
+  -- 8. Login mobile (sql/mobile_limite.sql + mobile_limite_2.sql): acesso verificado antes do PIN e travão global de 20 falhas/hora
   delete from public.cantina_mobile_falhas;
   update public.cantina_funcionarios
      set acesso_mobile = false, pin_hash = extensions.crypt('1357', extensions.gen_salt('bf')),
@@ -136,8 +136,19 @@ begin
 
   reset role;
   select count(*) into n from public.cantina_mobile_falhas;
-  if n <> 2 then raise exception 'FALHOU: deviam estar 2 falhas registadas, estão %', n; end if;
-  insert into public.cantina_mobile_falhas (numero) select 'teste' from generate_series(1, 18);
+  if n <> 1 then raise exception 'FALHOU: só o PIN errado devia contar, o número inexistente não (correu o mobile_limite_2.sql?); estão %', n; end if;
+
+  -- conta já bloqueada: o PIN nem é testado, não gasta o travão
+  update public.cantina_funcionarios set bloqueado_ate = now() + interval '15 minutes' where id = v_func;
+  perform set_config('role', 'anon', true);
+  j := public.mobile_login(v_numero, '0000');
+  if j ->> 'erro' is distinct from 'bloqueado' then raise exception 'FALHOU: conta bloqueada devia dar bloqueado, deu %', j; end if;
+  reset role;
+  select count(*) into n from public.cantina_mobile_falhas;
+  if n <> 1 then raise exception 'FALHOU: tentativas a uma conta já bloqueada contaram para o travão; estão %', n; end if;
+  update public.cantina_funcionarios set bloqueado_ate = null, tentativas_falhadas = 0 where id = v_func;
+
+  insert into public.cantina_mobile_falhas (numero) select 'teste' from generate_series(1, 19);
   perform set_config('role', 'anon', true);
   j := public.mobile_login(v_numero, '1357');
   if j ->> 'erro' is distinct from 'suspenso' then raise exception 'FALHOU: com 20 falhas na última hora devia dar suspenso, deu %', j; end if;
